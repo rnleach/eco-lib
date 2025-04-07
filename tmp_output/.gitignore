@@ -1,0 +1,5 @@
+# Ignore everyting!
+*
+# Except me and the README.md
+!.gitignore
+!README.md
