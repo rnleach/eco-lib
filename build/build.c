@@ -16,7 +16,7 @@ str_eq(char const *left, char const *right, size len)
 static b32
 load_file(char const *fname, size buf_size, byte *buffer, size *read)
 {
-    *read = coy_file_slurp(fname, buf_size, buffer);
+    *read = coy_file_slurp_internal(fname, buf_size, buffer);
     if(*read < 0) { return false; }
     return true;
 }

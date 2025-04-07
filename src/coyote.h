@@ -4,49 +4,15 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "elk.h"
+#include "magpie.h"
+
 #pragma warning(push)
 
 /*---------------------------------------------------------------------------------------------------------------------------
  * TODO: Things I'd like to add.
  *-------------------------------------------------------------------------------------------------------------------------*/
 // TODO: Formatted output.
-
-/*---------------------------------------------------------------------------------------------------------------------------
- * Define simpler types.
- *-------------------------------------------------------------------------------------------------------------------------*/
-
-/* Other libraries I may have already included may use these exact definitions too. */
-#ifndef _TYPE_ALIASES_
-#define _TYPE_ALIASES_
-
-typedef int32_t     b32;
-#ifndef false
-   #define false 0
-   #define true  1
-#endif
-
-#if !defined(_WINDOWS_) && !defined(_INC_WINDOWS)
-typedef char       byte;
-#endif
-
-typedef ptrdiff_t  size;
-typedef size_t    usize;
-
-typedef uintptr_t  uptr;
-typedef intptr_t   iptr;
-
-typedef float       f32;
-typedef double      f64;
-
-typedef uint8_t      u8;
-typedef uint16_t    u16;
-typedef uint32_t    u32;
-typedef uint64_t    u64;
-typedef int8_t       i8;
-typedef int16_t     i16;
-typedef int32_t     i32;
-typedef int64_t     i64;
-#endif
 
 #define COY_ARRAY_SIZE(A) (sizeof(A) / sizeof(A[0]))
 
@@ -57,35 +23,6 @@ typedef int64_t     i64;
 void *memset(void *buffer, int val, size_t num_bytes);
 void *memcpy(void *dest, void const *src, size_t num_bytes);
 void *memmove(void *dest, void const *src, size_t num_bytes);
-
-/*---------------------------------------------------------------------------------------------------------------------------
- *                                                       Error Handling
- *-------------------------------------------------------------------------------------------------------------------------*/
-
-// Crash immediately, useful with a debugger!
-#ifndef HARD_EXIT
-  #define HARD_EXIT (*(int volatile*)0) 
-#endif
-
-#ifndef PanicIf
-  #define PanicIf(assertion) StopIf((assertion), HARD_EXIT)
-#endif
-
-#ifndef Panic
-  #define Panic() HARD_EXIT
-#endif
-
-#ifndef StopIf
-  #define StopIf(assertion, error_action) if (assertion) { error_action; }
-#endif
-
-#ifndef Assert
-  #ifndef NDEBUG
-    #define Assert(assertion) if(!(assertion)) { HARD_EXIT; }
-  #else
-    #define Assert(assertion) (void)(assertion)
-  #endif
-#endif
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                      Date and Time
@@ -174,8 +111,16 @@ static inline b32 coy_file_read_u64(CoyFileReader *file, u64 *val);
 static inline b32 coy_file_read_str(CoyFileReader *file, size *len, char *str);     /* set len to buffer length, updated to actual size on return. */
 static inline void coy_file_reader_close(CoyFileReader *file);                      /* Must set valid member to false on success or failure!       */
 
-/* return size in bytes of the loaded data or -1 on error. If buffer is too small, load nothing and return -1 */
-static inline size coy_file_slurp(char const *filename, size buf_size, byte *buffer);
+/* Convenient loading of files. */
+static inline size coy_file_slurp(char const *filename, byte **out, ElkStaticArena *arena);   
+static inline ElkStr coy_file_slurp_text_static(char const *filename, ElkStaticArena *arena);
+static inline ElkStr coy_file_slurp_text_dyn(char const *filename, MagDynArena *arena);
+
+#define eco_file_slurp_text(fname, arena) _Generic((arena),                                                                 \
+                                         ElkStaticArena *: coy_file_slurp_text_static,                                      \
+                                         ElkDynArena *:    coy_file_slurp_text_dyn                                          \
+                                         )(fname, arena)
+
 
 
 #define COY_FILE_WRITER_BUF_SIZE COY_KiB(32)
@@ -215,6 +160,7 @@ typedef struct
 static inline CoyMemMappedFile coy_memmap_read_only(char const *filename);
 static inline void coy_memmap_close(CoyMemMappedFile *file);
 
+                                                                                            
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                File System Interactions
  *---------------------------------------------------------------------------------------------------------------------------
@@ -1058,6 +1004,66 @@ coy_profile_end_block(CoyProfileAnchor *anchor)
     block->tsc_elapsed_inclusive = anchor->old_tsc_elapsed_inclusive + elapsed;
     block->ref_count--;
 #endif
+}
+
+/* return size in bytes of the loaded data or -1 on error. If buffer is too small, load nothing and return -1 */
+static inline size coy_file_slurp_internal(char const *filename, size buf_size, byte *buffer);
+
+static inline size 
+coy_file_slurp(char const *filename, byte **out, ElkStaticArena *arena)
+{
+    size fsize = coy_file_size(filename);
+    StopIf(fsize < 0, goto ERR_RETURN);
+
+    *out = elk_static_arena_nmalloc(arena, fsize, byte);
+    StopIf(!*out, goto ERR_RETURN);
+
+    size size_read = coy_file_slurp_internal(filename, fsize, *out);
+    StopIf(fsize != size_read, goto ERR_RETURN);
+
+    return fsize;
+
+ERR_RETURN:
+    *out = NULL;
+    return -1;
+}
+
+static inline ElkStr 
+coy_file_slurp_text_static(char const *filename, ElkStaticArena *arena)
+{
+
+    size fsize = coy_file_size(filename);
+    StopIf(fsize < 0, goto ERR_RETURN);
+
+    byte *out = elk_static_arena_nmalloc(arena, fsize, byte);
+    StopIf(!out, goto ERR_RETURN);
+
+    size size_read = coy_file_slurp_internal(filename, fsize, out);
+    StopIf(fsize != size_read, goto ERR_RETURN);
+
+    return (ElkStr){ .start = out, .len = fsize };
+
+ERR_RETURN:
+    return (ElkStr){ .start = NULL, .len = 0 };
+}
+
+static inline ElkStr 
+coy_file_slurp_text_dyn(char const *filename, MagDynArena *arena)
+{
+
+    size fsize = coy_file_size(filename);
+    StopIf(fsize < 0, goto ERR_RETURN);
+
+    byte *out = mag_dyn_arena_nmalloc(arena, fsize, byte);
+    StopIf(!out, goto ERR_RETURN);
+
+    size size_read = coy_file_slurp_internal(filename, fsize, out);
+    StopIf(fsize != size_read, goto ERR_RETURN);
+
+    return (ElkStr){ .start = out, .len = fsize };
+
+ERR_RETURN:
+    return (ElkStr){ .start = NULL, .len = 0 };
 }
 
 

@@ -367,7 +367,7 @@ coy_file_reader_close(CoyFileReader *file)
 }
 
 static inline size 
-coy_file_slurp(char const *filename, size buf_size, byte *buffer)
+coy_file_slurp_internal(char const *filename, size buf_size, byte *buffer)
 {
     size file_size = coy_file_size(filename);
     StopIf(file_size < 1 || file_size > buf_size, goto ERR_RETURN);

@@ -122,7 +122,7 @@ test_file_slurp(void)
     Assert(success);
 
     char file_contents[1024] = {0};
-    size str_sz = coy_file_slurp(path_buf, sizeof(file_contents), file_contents);
+    size str_sz = coy_file_slurp_internal(path_buf, sizeof(file_contents), file_contents);
     Assert(str_sz > 1);
 
     char const test_str[] =
