@@ -12,6 +12,7 @@ test
 *.sln.docstates
 *.userprefs
 build/*.h
+build/build
 .vs
 *.sln
 *.vcproj

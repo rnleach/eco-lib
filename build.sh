@@ -9,6 +9,8 @@ CFLAGS="-Wall -Werror -Wno-unknown-pragmas -std=c11 -march=native"
 CFLAGS="$CFLAGS -D_DEFAULT_SOURCE -D_GNU_SOURCE -DCOY_PROFILE -I$SOURCEDIR -I$TESTDIR"
 LDLIBS="-ldl -lm -lpthread"
 
+CC=cc
+
 if [ "$#" -gt 0 -a "$1" = "debug" ]
 then
     echo "debug build"
@@ -16,7 +18,7 @@ then
 elif [ "$#" -gt 0 -a "$1" != "clean" -o \( "$#" = 0 \) ]
 then
     echo "release build"
-    CFLAGS="$CFLAGS -O3 -DNDEBUG"
+    CFLAGS="$CFLAGS -Wno-array-bounds -Wno-unused-but-set-variable -O3 -DNDEBUG"
 fi
 
 if [ "$#" -gt 0 -a "$1" = "clean" ] 
@@ -32,10 +34,10 @@ then
     rm -f $BUILD_SCRIPT_DIR/packrat.h
 else
     cd $BUILD_SCRIPT_DIR
-    cc build.c -o build
+    $CC build.c -o build
     ./build
     cd ..
-    cc $CFLAGS $TESTDIR/test.c -o test $LDLIBS
+    $CC $CFLAGS $TESTDIR/test.c -o test $LDLIBS
 fi
 
 if [ "$#" -gt 0 -a "$1" = "test" ]
