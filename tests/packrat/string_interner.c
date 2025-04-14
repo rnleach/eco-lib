@@ -27,35 +27,35 @@ test_string_interner(void)
     ElkStaticArena arena_i = {0};
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);
-    ElkStringInterner interner = elk_string_interner_create(3, arena);
-    ElkStringInterner *internerp = &interner;
+    PakStringInterner interner = pak_string_interner_create(3, arena);
+    PakStringInterner *internerp = &interner;
 
     // Fill the interner with strings!
     for (size i = 0; i < NUM_TEST_STRINGS; ++i) 
     {
         char *str = some_strings[i];
-        strs[i] = elk_string_interner_intern_cstring(internerp, str);
+        strs[i] = pak_string_interner_intern_cstring(internerp, str);
     }
 
     // Now see if we get the right ones back out!
     for (size i = 0; i < NUM_TEST_STRINGS; ++i) 
     {
         char *str = some_strings[i];
-        ElkStr interned_str = elk_string_interner_intern_cstring(internerp, str);
+        ElkStr interned_str = pak_string_interner_intern_cstring(internerp, str);
         Assert(strcmp(str, interned_str.start) == 0);
         Assert(strcmp(str, strs[i].start) == 0);
         Assert(interned_str.len == strs[i].len);
         Assert(interned_str.start == strs[i].start);
     }
 
-    elk_string_interner_destroy(internerp);
+    pak_string_interner_destroy(internerp);
 }
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                       All tests
  *-------------------------------------------------------------------------------------------------------------------------*/
 void
-elk_string_interner_tests()
+pak_string_interner_tests()
 {
     test_string_interner();
 }

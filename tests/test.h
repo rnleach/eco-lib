@@ -37,9 +37,9 @@ void coyote_threads_tests(void);
 
 static char const *test_data_dir = "tmp_output";
 
-void elk_string_interner_tests(void);
-void elk_hash_table_tests(void);
-void elk_hash_set_tests(void);
-void elk_sort_tests(void);
+void pak_string_interner_tests(void);
+void pak_hash_table_tests(void);
+void pak_hash_set_tests(void);
+void pak_sort_tests(void);
 
 #endif

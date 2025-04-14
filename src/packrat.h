@@ -19,22 +19,22 @@ typedef struct // Internal only
 {
     u64 hash;
     ElkStr str;
-} ElkStringInternerHandle;
+} PakStringInternerHandle;
 
 typedef struct 
 {
     ElkStaticArena *storage;          // This is where to store the strings
 
-    ElkStringInternerHandle *handles; // The hash table - handles index into storage
+    PakStringInternerHandle *handles; // The hash table - handles index into storage
     u32 num_handles;                  // The number of handles
     i8 size_exp;                      // Used to keep track of the length of *handles
-} ElkStringInterner;
+} PakStringInterner;
 
 
-static inline ElkStringInterner elk_string_interner_create(i8 size_exp, ElkStaticArena *storage);
-static inline void elk_string_interner_destroy(ElkStringInterner *interner);
-static inline ElkStr elk_string_interner_intern_cstring(ElkStringInterner *interner, char *string);
-static inline ElkStr elk_string_interner_intern(ElkStringInterner *interner, ElkStr str);
+static inline PakStringInterner pak_string_interner_create(i8 size_exp, ElkStaticArena *storage);
+static inline void pak_string_interner_destroy(PakStringInterner *interner);
+static inline ElkStr pak_string_interner_intern_cstring(PakStringInterner *interner, char *string);
+static inline ElkStr pak_string_interner_intern(PakStringInterner *interner, ElkStr str);
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *
@@ -111,28 +111,28 @@ typedef struct // Internal Only
     u64 hash;
     void *key;
     void *value;
-} ElkHashMapHandle;
+} PakHashMapHandle;
 
 typedef struct 
 {
     ElkStaticArena *arena;
-    ElkHashMapHandle *handles;
+    PakHashMapHandle *handles;
     size num_handles;
     ElkSimpleHash hasher;
     ElkEqFunction eq;
     i8 size_exp;
-} ElkHashMap;
+} PakHashMap;
 
-typedef size ElkHashMapKeyIter;
+typedef size PakHashMapKeyIter;
 
-static inline ElkHashMap elk_hash_map_create(i8 size_exp, ElkSimpleHash key_hash, ElkEqFunction key_eq, ElkStaticArena *arena);
-static inline void elk_hash_map_destroy(ElkHashMap *map);
-static inline void *elk_hash_map_insert(ElkHashMap *map, void *key, void *value); // if return != value, key was already in the map
-static inline void *elk_hash_map_lookup(ElkHashMap *map, void *key); // return NULL if not in map, otherwise return pointer to value
-static inline size elk_hash_map_len(ElkHashMap *map);
-static inline ElkHashMapKeyIter elk_hash_map_key_iter(ElkHashMap *map);
+static inline PakHashMap pak_hash_map_create(i8 size_exp, ElkSimpleHash key_hash, ElkEqFunction key_eq, ElkStaticArena *arena);
+static inline void pak_hash_map_destroy(PakHashMap *map);
+static inline void *pak_hash_map_insert(PakHashMap *map, void *key, void *value); // if return != value, key was already in the map
+static inline void *pak_hash_map_lookup(PakHashMap *map, void *key); // return NULL if not in map, otherwise return pointer to value
+static inline size pak_hash_map_len(PakHashMap *map);
+static inline PakHashMapKeyIter pak_hash_map_key_iter(PakHashMap *map);
 
-static inline void *elk_hash_map_key_iter_next(ElkHashMap *map, ElkHashMapKeyIter *iter);
+static inline void *pak_hash_map_key_iter_next(PakHashMap *map, PakHashMapKeyIter *iter);
 
 /*--------------------------------------------------------------------------------------------------------------------------
  *                                            Hash Map (Table, ElkStr as keys)
@@ -148,30 +148,30 @@ typedef struct
     u64 hash;
     ElkStr key;
     void *value;
-} ElkStrMapHandle;
+} PakStrMapHandle;
 
 typedef struct 
 {
     ElkStaticArena *arena;
-    ElkStrMapHandle *handles;
+    PakStrMapHandle *handles;
     size num_handles;
     i8 size_exp;
-} ElkStrMap;
+} PakStrMap;
 
-typedef size ElkStrMapKeyIter;
-typedef size ElkStrMapHandleIter;
+typedef size PakStrMapKeyIter;
+typedef size PakStrMapHandleIter;
 
-static inline ElkStrMap elk_str_map_create(i8 size_exp, ElkStaticArena *arena);
-static inline void elk_str_map_destroy(ElkStrMap *map);
-static inline void *elk_str_map_insert(ElkStrMap *map, ElkStr key, void *value); // if return != value, key was already in the map
-static inline void *elk_str_map_lookup(ElkStrMap *map, ElkStr key); // return NULL if not in map, otherwise return pointer to value
-static inline ElkStrMapHandle const *elk_str_map_lookup_handle(ElkStrMap *map, ElkStr key); // return NULL if not in map, otherwise return pointer to handle
-static inline size elk_str_map_len(ElkStrMap *map);
-static inline ElkStrMapKeyIter elk_str_map_key_iter(ElkStrMap *map);
-static inline ElkStrMapHandleIter elk_str_map_handle_iter(ElkStrMap *map);
+static inline PakStrMap pak_str_map_create(i8 size_exp, ElkStaticArena *arena);
+static inline void pak_str_map_destroy(PakStrMap *map);
+static inline void *pak_str_map_insert(PakStrMap *map, ElkStr key, void *value); // if return != value, key was already in the map
+static inline void *pak_str_map_lookup(PakStrMap *map, ElkStr key); // return NULL if not in map, otherwise return pointer to value
+static inline PakStrMapHandle const *pak_str_map_lookup_handle(PakStrMap *map, ElkStr key); // return NULL if not in map, otherwise return pointer to handle
+static inline size pak_str_map_len(PakStrMap *map);
+static inline PakStrMapKeyIter pak_str_map_key_iter(PakStrMap *map);
+static inline PakStrMapHandleIter pak_str_map_handle_iter(PakStrMap *map);
 
-static inline ElkStr elk_str_map_key_iter_next(ElkStrMap *map, ElkStrMapKeyIter *iter);
-static inline ElkStrMapHandle elk_str_map_handle_iter_next(ElkStrMap *map, ElkStrMapHandleIter *iter);
+static inline ElkStr pak_str_map_key_iter_next(PakStrMap *map, PakStrMapKeyIter *iter);
+static inline PakStrMapHandle pak_str_map_handle_iter_next(PakStrMap *map, PakStrMapHandleIter *iter);
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                        Hash Set
@@ -186,28 +186,28 @@ typedef struct // Internal only
 {
     u64 hash;
     void *value;
-} ElkHashSetHandle;
+} PakHashSetHandle;
 
 typedef struct 
 {
     ElkStaticArena *arena;
-    ElkHashSetHandle *handles;
+    PakHashSetHandle *handles;
     size num_handles;
     ElkSimpleHash hasher;
     ElkEqFunction eq;
     i8 size_exp;
-} ElkHashSet;
+} PakHashSet;
 
-typedef size ElkHashSetIter;
+typedef size PakHashSetIter;
 
-static inline ElkHashSet elk_hash_set_create(i8 size_exp, ElkSimpleHash val_hash, ElkEqFunction val_eq, ElkStaticArena *arena);
-static inline void elk_hash_set_destroy(ElkHashSet *set);
-static inline void *elk_hash_set_insert(ElkHashSet *set, void *value); // if return != value, value was already in the set
-static inline void *elk_hash_set_lookup(ElkHashSet *set, void *value); // return NULL if not in set, else return ptr to value
-static inline size elk_hash_set_len(ElkHashSet *set);
-static inline ElkHashSetIter elk_hash_set_value_iter(ElkHashSet *set);
+static inline PakHashSet pak_hash_set_create(i8 size_exp, ElkSimpleHash val_hash, ElkEqFunction val_eq, ElkStaticArena *arena);
+static inline void pak_hash_set_destroy(PakHashSet *set);
+static inline void *pak_hash_set_insert(PakHashSet *set, void *value); // if return != value, value was already in the set
+static inline void *pak_hash_set_lookup(PakHashSet *set, void *value); // return NULL if not in set, else return ptr to value
+static inline size pak_hash_set_len(PakHashSet *set);
+static inline PakHashSetIter pak_hash_set_value_iter(PakHashSet *set);
 
-static inline void *elk_hash_set_value_iter_next(ElkHashSet *set, ElkHashSetIter *iter);
+static inline void *pak_hash_set_value_iter_next(PakHashSet *set, PakHashSetIter *iter);
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                            Generic Macros for Collections
@@ -217,9 +217,9 @@ static inline void *elk_hash_set_value_iter_next(ElkHashSet *set, ElkHashSetIter
 #define pak_len(x) _Generic((x),                                                                                            \
         ElkQueueLedger *: elk_queue_ledger_len,                                                                             \
         ElkArrayLedger *: elk_array_ledger_len,                                                                             \
-        ElkHashMap *: elk_hash_map_len,                                                                                     \
-        ElkStrMap *: elk_str_map_len,                                                                                       \
-        ElkHashSet *: elk_hash_set_len)(x)
+        PakHashMap *: pak_hash_map_len,                                                                                     \
+        PakStrMap *: pak_str_map_len,                                                                                       \
+        PakHashSet *: pak_hash_set_len)(x)
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *
@@ -247,28 +247,28 @@ static inline void *elk_hash_set_value_iter_next(ElkHashSet *set, ElkHashSetIter
 
 typedef enum
 {
-    ELK_RADIX_SORT_UINT8,
-    ELK_RADIX_SORT_INT8,
-    ELK_RADIX_SORT_UINT16,
-    ELK_RADIX_SORT_INT16,
-    ELK_RADIX_SORT_UINT32,
-    ELK_RADIX_SORT_INT32,
-    ELK_RADIX_SORT_F32,
-    ELK_RADIX_SORT_UINT64,
-    ELK_RADIX_SORT_INT64,
-    ELK_RADIX_SORT_F64,
-} ElkRadixSortByType;
+    PAK_RADIX_SORT_UINT8,
+    PAK_RADIX_SORT_INT8,
+    PAK_RADIX_SORT_UINT16,
+    PAK_RADIX_SORT_INT16,
+    PAK_RADIX_SORT_UINT32,
+    PAK_RADIX_SORT_INT32,
+    PAK_RADIX_SORT_F32,
+    PAK_RADIX_SORT_UINT64,
+    PAK_RADIX_SORT_INT64,
+    PAK_RADIX_SORT_F64,
+} PakRadixSortByType;
 
-typedef enum { ELK_SORT_ASCENDING, ELK_SORT_DESCENDING } ElkSortOrder;
+typedef enum { PAK_SORT_ASCENDING, PAK_SORT_DESCENDING } PakSortOrder;
 
-static inline void elk_radix_sort(
+static inline void pak_radix_sort(
         void *buffer, 
         size num, 
         size offset, 
         size stride, 
         void *scratch, 
-        ElkRadixSortByType sort_type, 
-        ElkSortOrder order);
+        PakRadixSortByType sort_type, 
+        PakSortOrder order);
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *
@@ -279,16 +279,16 @@ static inline void elk_radix_sort(
  *
  *
  *-------------------------------------------------------------------------------------------------------------------------*/
-static inline ElkStringInterner 
-elk_string_interner_create(i8 size_exp, ElkStaticArena *storage)
+static inline PakStringInterner 
+pak_string_interner_create(i8 size_exp, ElkStaticArena *storage)
 {
     Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
 
     usize const handles_len = (usize)(1 << size_exp);
-    ElkStringInternerHandle *handles = elk_static_arena_nmalloc(storage, handles_len, ElkStringInternerHandle);
+    PakStringInternerHandle *handles = elk_static_arena_nmalloc(storage, handles_len, PakStringInternerHandle);
     PanicIf(!handles);
 
-    return (ElkStringInterner)
+    return (PakStringInterner)
     {
         .storage = storage,
         .handles = handles,
@@ -298,20 +298,20 @@ elk_string_interner_create(i8 size_exp, ElkStaticArena *storage)
 }
 
 static inline void
-elk_string_interner_destroy(ElkStringInterner *interner)
+pak_string_interner_destroy(PakStringInterner *interner)
 {
     return;
 }
 
 static inline b32
-elk_hash_table_large_enough(usize num_handles, i8 size_exp)
+pak_hash_table_large_enough(usize num_handles, i8 size_exp)
 {
     // Shoot for no more than 75% of slots filled.
     return num_handles < 3 * (1 << size_exp) / 4;
 }
 
 static inline u32
-elk_hash_lookup(u64 hash, i8 exp, u32 idx)
+pak_hash_lookup(u64 hash, i8 exp, u32 idx)
 {
     // Copied from https://nullprogram.com/blog/2022/08/08
     // All code & writing on this blog is in the public domain.
@@ -321,7 +321,7 @@ elk_hash_lookup(u64 hash, i8 exp, u32 idx)
 }
 
 static inline void
-elk_string_interner_expand_table(ElkStringInterner *interner)
+pak_string_interner_expand_table(PakStringInterner *interner)
 {
     i8 const size_exp = interner->size_exp;
     i8 const new_size_exp = size_exp + 1;
@@ -329,12 +329,12 @@ elk_string_interner_expand_table(ElkStringInterner *interner)
     usize const handles_len = (usize)(1 << size_exp);
     usize const new_handles_len = (usize)(1 << new_size_exp);
 
-    ElkStringInternerHandle *new_handles = elk_static_arena_nmalloc(interner->storage, new_handles_len, ElkStringInternerHandle);
+    PakStringInternerHandle *new_handles = elk_static_arena_nmalloc(interner->storage, new_handles_len, PakStringInternerHandle);
     PanicIf(!new_handles);
 
     for (u32 i = 0; i < handles_len; i++) 
     {
-        ElkStringInternerHandle *handle = &interner->handles[i];
+        PakStringInternerHandle *handle = &interner->handles[i];
 
         if (handle->str.start == NULL) { continue; } // Skip if it's empty
 
@@ -343,8 +343,8 @@ elk_string_interner_expand_table(ElkStringInterner *interner)
         u32 j = hash & 0xffffffff; // truncate
         while (true) 
         {
-            j = elk_hash_lookup(hash, new_size_exp, j);
-            ElkStringInternerHandle *new_handle = &new_handles[j];
+            j = pak_hash_lookup(hash, new_size_exp, j);
+            PakStringInternerHandle *new_handle = &new_handles[j];
 
             if (!new_handle->str.start)
             {
@@ -364,14 +364,14 @@ elk_string_interner_expand_table(ElkStringInterner *interner)
 }
 
 static inline ElkStr
-elk_string_interner_intern_cstring(ElkStringInterner *interner, char *string)
+pak_string_interner_intern_cstring(PakStringInterner *interner, char *string)
 {
     ElkStr str = elk_str_from_cstring(string);
-    return elk_string_interner_intern(interner, str);
+    return pak_string_interner_intern(interner, str);
 }
 
 static inline ElkStr
-elk_string_interner_intern(ElkStringInterner *interner, ElkStr str)
+pak_string_interner_intern(PakStringInterner *interner, ElkStr str)
 {
     // Inspired by https://nullprogram.com/blog/2022/08/08
     // All code & writing on this blog is in the public domain.
@@ -380,19 +380,19 @@ elk_string_interner_intern(ElkStringInterner *interner, ElkStr str)
     u32 i = hash & 0xffffffff; // truncate
     while (true)
     {
-        i = elk_hash_lookup(hash, interner->size_exp, i);
-        ElkStringInternerHandle *handle = &interner->handles[i];
+        i = pak_hash_lookup(hash, interner->size_exp, i);
+        PakStringInternerHandle *handle = &interner->handles[i];
 
         if (!handle->str.start)
         {
             // empty, insert here if room in the table of handles. Check for room first!
-            if (elk_hash_table_large_enough(interner->num_handles, interner->size_exp))
+            if (pak_hash_table_large_enough(interner->num_handles, interner->size_exp))
             {
                 char *dest = elk_static_arena_nmalloc(interner->storage, str.len + 1, char);
                 PanicIf(!dest);
                 ElkStr interned_str = elk_str_copy(str.len + 1, dest, str);
 
-                *handle = (ElkStringInternerHandle){.hash = hash, .str = interned_str};
+                *handle = (PakStringInternerHandle){.hash = hash, .str = interned_str};
                 interner->num_handles += 1;
 
                 return handle->str;
@@ -400,11 +400,11 @@ elk_string_interner_intern(ElkStringInterner *interner, ElkStr str)
             else 
             {
                 // Grow the table so we have room
-                elk_string_interner_expand_table(interner);
+                pak_string_interner_expand_table(interner);
 
                 // Recurse because all the state needed by the *_lookup function was just crushed
                 // by the expansion of the table.
-                return elk_string_interner_intern(interner, str);
+                return pak_string_interner_intern(interner, str);
             }
         }
         else if (handle->hash == hash && !elk_str_cmp(str, handle->str)) 
@@ -415,16 +415,16 @@ elk_string_interner_intern(ElkStringInterner *interner, ElkStr str)
     }
 }
 
-static ElkHashMap 
-elk_hash_map_create(i8 size_exp, ElkSimpleHash key_hash, ElkEqFunction key_eq, ElkStaticArena *arena)
+static PakHashMap 
+pak_hash_map_create(i8 size_exp, ElkSimpleHash key_hash, ElkEqFunction key_eq, ElkStaticArena *arena)
 {
     Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
 
     size const handles_len = (size)(1 << size_exp);
-    ElkHashMapHandle *handles = elk_static_arena_nmalloc(arena, handles_len, ElkHashMapHandle);
+    PakHashMapHandle *handles = elk_static_arena_nmalloc(arena, handles_len, PakHashMapHandle);
     PanicIf(!handles);
 
-    return (ElkHashMap)
+    return (PakHashMap)
     {
         .arena = arena,
         .handles = handles,
@@ -436,13 +436,13 @@ elk_hash_map_create(i8 size_exp, ElkSimpleHash key_hash, ElkEqFunction key_eq, E
 }
 
 static inline void 
-elk_hash_map_destroy(ElkHashMap *map)
+pak_hash_map_destroy(PakHashMap *map)
 {
     return;
 }
 
 static inline void
-elk_hash_table_expand(ElkHashMap *map)
+pak_hash_table_expand(PakHashMap *map)
 {
     i8 const size_exp = map->size_exp;
     i8 const new_size_exp = size_exp + 1;
@@ -450,12 +450,12 @@ elk_hash_table_expand(ElkHashMap *map)
     size const handles_len = (size)(1 << size_exp);
     size const new_handles_len = (size)(1 << new_size_exp);
 
-    ElkHashMapHandle *new_handles = elk_static_arena_nmalloc(map->arena, new_handles_len, ElkHashMapHandle);
+    PakHashMapHandle *new_handles = elk_static_arena_nmalloc(map->arena, new_handles_len, PakHashMapHandle);
     PanicIf(!new_handles);
 
     for (u32 i = 0; i < handles_len; i++) 
     {
-        ElkHashMapHandle *handle = &map->handles[i];
+        PakHashMapHandle *handle = &map->handles[i];
 
         if (handle->key == NULL) { continue; } // Skip if it's empty
 
@@ -464,8 +464,8 @@ elk_hash_table_expand(ElkHashMap *map)
         u32 j = hash & 0xffffffff; // truncate
         while (true) 
         {
-            j = elk_hash_lookup(hash, new_size_exp, j);
-            ElkHashMapHandle *new_handle = &new_handles[j];
+            j = pak_hash_lookup(hash, new_size_exp, j);
+            PakHashMapHandle *new_handle = &new_handles[j];
 
             if (!new_handle->key)
             {
@@ -485,7 +485,7 @@ elk_hash_table_expand(ElkHashMap *map)
 }
 
 static inline void *
-elk_hash_map_insert(ElkHashMap *map, void *key, void *value)
+pak_hash_map_insert(PakHashMap *map, void *key, void *value)
 {
     // Inspired by https://nullprogram.com/blog/2022/08/08
     // All code & writing on this blog is in the public domain.
@@ -494,16 +494,16 @@ elk_hash_map_insert(ElkHashMap *map, void *key, void *value)
     u32 i = hash & 0xffffffff; // truncate
     while (true)
     {
-        i = elk_hash_lookup(hash, map->size_exp, i);
-        ElkHashMapHandle *handle = &map->handles[i];
+        i = pak_hash_lookup(hash, map->size_exp, i);
+        PakHashMapHandle *handle = &map->handles[i];
 
         if (!handle->key)
         {
             // empty, insert here if room in the table of handles. Check for room first!
-            if (elk_hash_table_large_enough(map->num_handles, map->size_exp))
+            if (pak_hash_table_large_enough(map->num_handles, map->size_exp))
             {
 
-                *handle = (ElkHashMapHandle){.hash = hash, .key=key, .value=value};
+                *handle = (PakHashMapHandle){.hash = hash, .key=key, .value=value};
                 map->num_handles += 1;
 
                 return handle->value;
@@ -511,11 +511,11 @@ elk_hash_map_insert(ElkHashMap *map, void *key, void *value)
             else 
             {
                 // Grow the table so we have room
-                elk_hash_table_expand(map);
+                pak_hash_table_expand(map);
 
                 // Recurse because all the state needed by the *_lookup function was just crushed
                 // by the expansion of the table.
-                return elk_hash_map_insert(map, key, value);
+                return pak_hash_map_insert(map, key, value);
             }
         }
         else if (handle->hash == hash && map->eq(handle->key, key)) 
@@ -529,7 +529,7 @@ elk_hash_map_insert(ElkHashMap *map, void *key, void *value)
 }
 
 static inline void *
-elk_hash_map_lookup(ElkHashMap *map, void *key)
+pak_hash_map_lookup(PakHashMap *map, void *key)
 {
     // Inspired by https://nullprogram.com/blog/2022/08/08
     // All code & writing on this blog is in the public domain.
@@ -538,8 +538,8 @@ elk_hash_map_lookup(ElkHashMap *map, void *key)
     u32 i = hash & 0xffffffff; // truncate
     while (true)
     {
-        i = elk_hash_lookup(hash, map->size_exp, i);
-        ElkHashMapHandle *handle = &map->handles[i];
+        i = pak_hash_lookup(hash, map->size_exp, i);
+        PakHashMapHandle *handle = &map->handles[i];
 
         if (!handle->key)
         {
@@ -557,19 +557,19 @@ elk_hash_map_lookup(ElkHashMap *map, void *key)
 }
 
 static inline size 
-elk_hash_map_len(ElkHashMap *map)
+pak_hash_map_len(PakHashMap *map)
 {
     return map->num_handles;
 }
 
-static inline ElkHashMapKeyIter 
-elk_hash_map_key_iter(ElkHashMap *map)
+static inline PakHashMapKeyIter 
+pak_hash_map_key_iter(PakHashMap *map)
 {
     return 0;
 }
 
 static inline void *
-elk_hash_map_key_iter_next(ElkHashMap *map, ElkHashMapKeyIter *iter)
+pak_hash_map_key_iter_next(PakHashMap *map, PakHashMapKeyIter *iter)
 {
     size const max_iter = (size)(1 << map->size_exp);
     void *next_key = NULL;
@@ -585,16 +585,16 @@ elk_hash_map_key_iter_next(ElkHashMap *map, ElkHashMapKeyIter *iter)
     return next_key;
 }
 
-static inline ElkStrMap 
-elk_str_map_create(i8 size_exp, ElkStaticArena *arena)
+static inline PakStrMap 
+pak_str_map_create(i8 size_exp, ElkStaticArena *arena)
 {
     Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
 
     size const handles_len = (size)(1 << size_exp);
-    ElkStrMapHandle *handles = elk_static_arena_nmalloc(arena, handles_len, ElkStrMapHandle);
+    PakStrMapHandle *handles = elk_static_arena_nmalloc(arena, handles_len, PakStrMapHandle);
     PanicIf(!handles);
 
-    return (ElkStrMap)
+    return (PakStrMap)
     {
         .arena = arena,
         .handles = handles,
@@ -604,13 +604,13 @@ elk_str_map_create(i8 size_exp, ElkStaticArena *arena)
 }
 
 static inline void
-elk_str_map_destroy(ElkStrMap *map)
+pak_str_map_destroy(PakStrMap *map)
 {
     return;
 }
 
 static inline void
-elk_str_table_expand(ElkStrMap *map)
+pak_str_table_expand(PakStrMap *map)
 {
     i8 const size_exp = map->size_exp;
     i8 const new_size_exp = size_exp + 1;
@@ -618,12 +618,12 @@ elk_str_table_expand(ElkStrMap *map)
     size const handles_len = (size)(1 << size_exp);
     size const new_handles_len = (size)(1 << new_size_exp);
 
-    ElkStrMapHandle *new_handles = elk_static_arena_nmalloc(map->arena, new_handles_len, ElkStrMapHandle);
+    PakStrMapHandle *new_handles = elk_static_arena_nmalloc(map->arena, new_handles_len, PakStrMapHandle);
     PanicIf(!new_handles);
 
     for (u32 i = 0; i < handles_len; i++) 
     {
-        ElkStrMapHandle *handle = &map->handles[i];
+        PakStrMapHandle *handle = &map->handles[i];
 
         if (handle->key.start == NULL) { continue; } // Skip if it's empty
 
@@ -632,8 +632,8 @@ elk_str_table_expand(ElkStrMap *map)
         u32 j = hash & 0xffffffff; // truncate
         while (true) 
         {
-            j = elk_hash_lookup(hash, new_size_exp, j);
-            ElkStrMapHandle *new_handle = &new_handles[j];
+            j = pak_hash_lookup(hash, new_size_exp, j);
+            PakStrMapHandle *new_handle = &new_handles[j];
 
             if (!new_handle->key.start)
             {
@@ -653,7 +653,7 @@ elk_str_table_expand(ElkStrMap *map)
 }
 
 static inline void *
-elk_str_map_insert(ElkStrMap *map, ElkStr key, void *value)
+pak_str_map_insert(PakStrMap *map, ElkStr key, void *value)
 {
     // Inspired by https://nullprogram.com/blog/2022/08/08
     // All code & writing on this blog is in the public domain.
@@ -662,16 +662,16 @@ elk_str_map_insert(ElkStrMap *map, ElkStr key, void *value)
     u32 i = hash & 0xffffffff; // truncate
     while (true)
     {
-        i = elk_hash_lookup(hash, map->size_exp, i);
-        ElkStrMapHandle *handle = &map->handles[i];
+        i = pak_hash_lookup(hash, map->size_exp, i);
+        PakStrMapHandle *handle = &map->handles[i];
 
         if (!handle->key.start)
         {
             // empty, insert here if room in the table of handles. Check for room first!
-            if (elk_hash_table_large_enough(map->num_handles, map->size_exp))
+            if (pak_hash_table_large_enough(map->num_handles, map->size_exp))
             {
 
-                *handle = (ElkStrMapHandle){.hash = hash, .key=key, .value=value};
+                *handle = (PakStrMapHandle){.hash = hash, .key=key, .value=value};
                 map->num_handles += 1;
 
                 return handle->value;
@@ -679,11 +679,11 @@ elk_str_map_insert(ElkStrMap *map, ElkStr key, void *value)
             else 
             {
                 // Grow the table so we have room
-                elk_str_table_expand(map);
+                pak_str_table_expand(map);
 
                 // Recurse because all the state needed by the *_lookup function was just crushed
                 // by the expansion of the table.
-                return elk_str_map_insert(map, key, value);
+                return pak_str_map_insert(map, key, value);
             }
         }
         else if (handle->hash == hash && !elk_str_cmp(key, handle->key)) 
@@ -698,7 +698,7 @@ elk_str_map_insert(ElkStrMap *map, ElkStr key, void *value)
 }
 
 static inline void *
-elk_str_map_lookup(ElkStrMap *map, ElkStr key)
+pak_str_map_lookup(PakStrMap *map, ElkStr key)
 {
     // Inspired by https://nullprogram.com/blog/2022/08/08
     // All code & writing on this blog is in the public domain.
@@ -707,8 +707,8 @@ elk_str_map_lookup(ElkStrMap *map, ElkStr key)
     u32 i = hash & 0xffffffff; // truncate
     while (true)
     {
-        i = elk_hash_lookup(hash, map->size_exp, i);
-        ElkStrMapHandle *handle = &map->handles[i];
+        i = pak_hash_lookup(hash, map->size_exp, i);
+        PakStrMapHandle *handle = &map->handles[i];
 
         if (!handle->key.start) { return NULL; }
         else if (handle->hash == hash && !elk_str_cmp(key, handle->key)) 
@@ -721,8 +721,8 @@ elk_str_map_lookup(ElkStrMap *map, ElkStr key)
     return NULL;
 }
 
-static inline ElkStrMapHandle const *
-elk_str_map_lookup_handle(ElkStrMap *map, ElkStr key)
+static inline PakStrMapHandle const *
+pak_str_map_lookup_handle(PakStrMap *map, ElkStr key)
 {
     // Inspired by https://nullprogram.com/blog/2022/08/08
     // All code & writing on this blog is in the public domain.
@@ -731,8 +731,8 @@ elk_str_map_lookup_handle(ElkStrMap *map, ElkStr key)
     u32 i = hash & 0xffffffff; // truncate
     while (true)
     {
-        i = elk_hash_lookup(hash, map->size_exp, i);
-        ElkStrMapHandle *handle = &map->handles[i];
+        i = pak_hash_lookup(hash, map->size_exp, i);
+        PakStrMapHandle *handle = &map->handles[i];
 
         if (!handle->key.start) { return NULL; }
         else if (handle->hash == hash && !elk_str_cmp(key, handle->key)) 
@@ -746,25 +746,25 @@ elk_str_map_lookup_handle(ElkStrMap *map, ElkStr key)
 }
 
 static inline size
-elk_str_map_len(ElkStrMap *map)
+pak_str_map_len(PakStrMap *map)
 {
     return map->num_handles;
 }
 
-static inline ElkHashMapKeyIter 
-elk_str_map_key_iter(ElkStrMap *map)
+static inline PakHashMapKeyIter 
+pak_str_map_key_iter(PakStrMap *map)
 {
     return 0;
 }
 
-static inline ElkStrMapHandleIter 
-elk_str_map_handle_iter(ElkStrMap *map)
+static inline PakStrMapHandleIter 
+pak_str_map_handle_iter(PakStrMap *map)
 {
     return 0;
 }
 
 static inline ElkStr 
-elk_str_map_key_iter_next(ElkStrMap *map, ElkStrMapKeyIter *iter)
+pak_str_map_key_iter_next(PakStrMap *map, PakStrMapKeyIter *iter)
 {
     size const max_iter = (size)(1 << map->size_exp);
     if(*iter < max_iter) 
@@ -786,13 +786,13 @@ elk_str_map_key_iter_next(ElkStrMap *map, ElkStrMapKeyIter *iter)
 
 }
 
-static inline ElkStrMapHandle 
-elk_str_map_handle_iter_next(ElkStrMap *map, ElkStrMapHandleIter *iter)
+static inline PakStrMapHandle 
+pak_str_map_handle_iter_next(PakStrMap *map, PakStrMapHandleIter *iter)
 {
     size const max_iter = (size)(1 << map->size_exp);
     if(*iter < max_iter) 
     {
-        ElkStrMapHandle next = map->handles[*iter];
+        PakStrMapHandle next = map->handles[*iter];
         *iter += 1;
         while(next.key.start == NULL && *iter < max_iter)
         {
@@ -804,20 +804,20 @@ elk_str_map_handle_iter_next(ElkStrMap *map, ElkStrMapHandleIter *iter)
     }
     else
     {
-        return (ElkStrMapHandle){ .key = (ElkStr){.start=NULL, .len=0}, .hash = 0, .value = NULL };
+        return (PakStrMapHandle){ .key = (ElkStr){.start=NULL, .len=0}, .hash = 0, .value = NULL };
     }
 }
 
-static inline ElkHashSet 
-elk_hash_set_create(i8 size_exp, ElkSimpleHash val_hash, ElkEqFunction val_eq, ElkStaticArena *arena)
+static inline PakHashSet 
+pak_hash_set_create(i8 size_exp, ElkSimpleHash val_hash, ElkEqFunction val_eq, ElkStaticArena *arena)
 {
     Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
 
     size const handles_len = (size)(1 << size_exp);
-    ElkHashSetHandle *handles = elk_static_arena_nmalloc(arena, handles_len, ElkHashSetHandle);
+    PakHashSetHandle *handles = elk_static_arena_nmalloc(arena, handles_len, PakHashSetHandle);
     PanicIf(!handles);
 
-    return (ElkHashSet)
+    return (PakHashSet)
     {
         .arena = arena,
         .handles = handles,
@@ -829,13 +829,13 @@ elk_hash_set_create(i8 size_exp, ElkSimpleHash val_hash, ElkEqFunction val_eq, E
 }
 
 static inline void 
-elk_hash_set_destroy(ElkHashSet *set)
+pak_hash_set_destroy(PakHashSet *set)
 {
     return;
 }
 
 static void
-elk_hash_set_expand(ElkHashSet *set)
+pak_hash_set_expand(PakHashSet *set)
 {
     i8 const size_exp = set->size_exp;
     i8 const new_size_exp = size_exp + 1;
@@ -843,12 +843,12 @@ elk_hash_set_expand(ElkHashSet *set)
     size const handles_len = (size)(1 << size_exp);
     size const new_handles_len = (size)(1 << new_size_exp);
 
-    ElkHashSetHandle *new_handles = elk_static_arena_nmalloc(set->arena, new_handles_len, ElkHashSetHandle);
+    PakHashSetHandle *new_handles = elk_static_arena_nmalloc(set->arena, new_handles_len, PakHashSetHandle);
     PanicIf(!new_handles);
 
     for (u32 i = 0; i < handles_len; i++) 
     {
-        ElkHashSetHandle *handle = &set->handles[i];
+        PakHashSetHandle *handle = &set->handles[i];
 
         if (handle->value == NULL) { continue; } // Skip if it's empty
 
@@ -857,8 +857,8 @@ elk_hash_set_expand(ElkHashSet *set)
         u32 j = hash & 0xffffffff; // truncate
         while (true) 
         {
-            j = elk_hash_lookup(hash, new_size_exp, j);
-            ElkHashSetHandle *new_handle = &new_handles[j];
+            j = pak_hash_lookup(hash, new_size_exp, j);
+            PakHashSetHandle *new_handle = &new_handles[j];
 
             if (!new_handle->value)
             {
@@ -878,7 +878,7 @@ elk_hash_set_expand(ElkHashSet *set)
 }
 
 static inline void *
-elk_hash_set_insert(ElkHashSet *set, void *value)
+pak_hash_set_insert(PakHashSet *set, void *value)
 {
     // Inspired by https://nullprogram.com/blog/2022/08/08
     // All code & writing on this blog is in the public domain.
@@ -887,16 +887,16 @@ elk_hash_set_insert(ElkHashSet *set, void *value)
     u32 i = hash & 0xffffffff; // truncate
     while (true)
     {
-        i = elk_hash_lookup(hash, set->size_exp, i);
-        ElkHashSetHandle *handle = &set->handles[i];
+        i = pak_hash_lookup(hash, set->size_exp, i);
+        PakHashSetHandle *handle = &set->handles[i];
 
         if (!handle->value)
         {
             // empty, insert here if room in the table of handles. Check for room first!
-            if (elk_hash_table_large_enough(set->num_handles, set->size_exp))
+            if (pak_hash_table_large_enough(set->num_handles, set->size_exp))
             {
 
-                *handle = (ElkHashSetHandle){.hash = hash, .value=value};
+                *handle = (PakHashSetHandle){.hash = hash, .value=value};
                 set->num_handles += 1;
 
                 return handle->value;
@@ -904,11 +904,11 @@ elk_hash_set_insert(ElkHashSet *set, void *value)
             else 
             {
                 // Grow the table so we have room
-                elk_hash_set_expand(set);
+                pak_hash_set_expand(set);
 
                 // Recurse because all the state needed by the *_lookup function was just crushed
                 // by the expansion of the set.
-                return elk_hash_set_insert(set, value);
+                return pak_hash_set_insert(set, value);
             }
         }
         else if (handle->hash == hash && set->eq(handle->value, value)) 
@@ -922,7 +922,7 @@ elk_hash_set_insert(ElkHashSet *set, void *value)
 }
 
 static inline void *
-elk_hash_set_lookup(ElkHashSet *set, void *value)
+pak_hash_set_lookup(PakHashSet *set, void *value)
 {
     // Inspired by https://nullprogram.com/blog/2022/08/08
     // All code & writing on this blog is in the public domain.
@@ -931,8 +931,8 @@ elk_hash_set_lookup(ElkHashSet *set, void *value)
     u32 i = hash & 0xffffffff; // truncate
     while (true)
     {
-        i = elk_hash_lookup(hash, set->size_exp, i);
-        ElkHashSetHandle *handle = &set->handles[i];
+        i = pak_hash_lookup(hash, set->size_exp, i);
+        PakHashSetHandle *handle = &set->handles[i];
 
         if (!handle->value)
         {
@@ -949,19 +949,19 @@ elk_hash_set_lookup(ElkHashSet *set, void *value)
 }
 
 static inline size 
-elk_hash_set_len(ElkHashSet *set)
+pak_hash_set_len(PakHashSet *set)
 {
     return set->num_handles;
 }
 
-static inline ElkHashSetIter
-elk_hash_set_value_iter(ElkHashSet *set)
+static inline PakHashSetIter
+pak_hash_set_value_iter(PakHashSet *set)
 {
     return 0;
 }
 
 static inline void *
-elk_hash_set_value_iter_next(ElkHashSet *set, ElkHashSetIter *iter)
+pak_hash_set_value_iter_next(PakHashSet *set, PakHashSetIter *iter)
 {
     size const max_iter = (size)(1 << set->size_exp);
     void *next_value = NULL;
@@ -977,156 +977,156 @@ elk_hash_set_value_iter_next(ElkHashSet *set, ElkHashSetIter *iter)
     return next_value;
 }
 
-#define ELK_I8_FLIP(x) ((x) ^ UINT8_C(0x80))
-#define ELK_I8_FLIP_BACK(x) ELK_I8_FLIP(x)
+#define PAK_I8_FLIP(x) ((x) ^ UINT8_C(0x80))
+#define PAK_I8_FLIP_BACK(x) PAK_I8_FLIP(x)
 
-#define ELK_I16_FLIP(x) ((x) ^ UINT16_C(0x8000))
-#define ELK_I16_FLIP_BACK(x) ELK_I16_FLIP(x)
+#define PAK_I16_FLIP(x) ((x) ^ UINT16_C(0x8000))
+#define PAK_I16_FLIP_BACK(x) PAK_I16_FLIP(x)
 
-#define ELK_I32_FLIP(x) ((x) ^ UINT32_C(0x80000000))
-#define ELK_I32_FLIP_BACK(x) ELK_I32_FLIP(x)
+#define PAK_I32_FLIP(x) ((x) ^ UINT32_C(0x80000000))
+#define PAK_I32_FLIP_BACK(x) PAK_I32_FLIP(x)
 
-#define ELK_I64_FLIP(x) ((x) ^ UINT64_C(0x8000000000000000))
-#define ELK_I64_FLIP_BACK(x) ELK_I64_FLIP(x)
+#define PAK_I64_FLIP(x) ((x) ^ UINT64_C(0x8000000000000000))
+#define PAK_I64_FLIP_BACK(x) PAK_I64_FLIP(x)
 
-#define ELK_F32_FLIP(x) ((x) ^ (-(i32)(((u32)(x)) >> 31) | UINT32_C(0x80000000)))
-#define ELK_F32_FLIP_BACK(x) ((x) ^ (((((u32)(x)) >> 31) - 1) | UINT32_C(0x80000000)))
+#define PAK_F32_FLIP(x) ((x) ^ (-(i32)(((u32)(x)) >> 31) | UINT32_C(0x80000000)))
+#define PAK_F32_FLIP_BACK(x) ((x) ^ (((((u32)(x)) >> 31) - 1) | UINT32_C(0x80000000)))
 
-#define ELK_F64_FLIP(x) ((x) ^ (-(i64)(((u64)(x)) >> 63) | UINT64_C(0x8000000000000000)))
-#define ELK_F64_FLIP_BACK(x) ((x) ^ (((((u64)(x)) >> 63) - 1) | UINT64_C(0x8000000000000000)))
+#define PAK_F64_FLIP(x) ((x) ^ (-(i64)(((u64)(x)) >> 63) | UINT64_C(0x8000000000000000)))
+#define PAK_F64_FLIP_BACK(x) ((x) ^ (((((u64)(x)) >> 63) - 1) | UINT64_C(0x8000000000000000)))
 
 static inline void
-elk_radix_pre_sort_transform(void *buffer, size num, size offset, size stride, ElkRadixSortByType sort_type)
+pak_radix_pre_sort_transform(void *buffer, size num, size offset, size stride, PakRadixSortByType sort_type)
 {
     Assert(
-           sort_type == ELK_RADIX_SORT_UINT64 || sort_type == ELK_RADIX_SORT_INT64 || sort_type == ELK_RADIX_SORT_F64
-        || sort_type == ELK_RADIX_SORT_UINT32 || sort_type == ELK_RADIX_SORT_INT32 || sort_type == ELK_RADIX_SORT_F32
-        || sort_type == ELK_RADIX_SORT_UINT16 || sort_type == ELK_RADIX_SORT_INT16
-        || sort_type == ELK_RADIX_SORT_UINT8  || sort_type == ELK_RADIX_SORT_INT8
+           sort_type == PAK_RADIX_SORT_UINT64 || sort_type == PAK_RADIX_SORT_INT64 || sort_type == PAK_RADIX_SORT_F64
+        || sort_type == PAK_RADIX_SORT_UINT32 || sort_type == PAK_RADIX_SORT_INT32 || sort_type == PAK_RADIX_SORT_F32
+        || sort_type == PAK_RADIX_SORT_UINT16 || sort_type == PAK_RADIX_SORT_INT16
+        || sort_type == PAK_RADIX_SORT_UINT8  || sort_type == PAK_RADIX_SORT_INT8
     );
 
     for(size i = 0; i < num; ++i)
     {
         switch(sort_type)
         {
-            case ELK_RADIX_SORT_F64:
+            case PAK_RADIX_SORT_F64:
             {
                 /* Flip bits so doubles sort correctly. */
                 u64 *v = (u64 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_F64_FLIP(*v);
+                *v = PAK_F64_FLIP(*v);
             } break;
 
-            case ELK_RADIX_SORT_INT64:
+            case PAK_RADIX_SORT_INT64:
             {
                 /* Flip bits so two's complement signed integers sort correctly. */
                 u64 *v = (u64 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_I64_FLIP(*v);
+                *v = PAK_I64_FLIP(*v);
             } break;
 
-            case ELK_RADIX_SORT_F32:
+            case PAK_RADIX_SORT_F32:
             {
                 /* Flip bits so doubles sort correctly. */
                 u32 *v = (u32 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_F32_FLIP(*v);
+                *v = PAK_F32_FLIP(*v);
             } break;
 
-            case ELK_RADIX_SORT_INT32:
+            case PAK_RADIX_SORT_INT32:
             {
                 /* Flip bits so two's complement signed integers sort correctly. */
                 u32 *v = (u32 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_I32_FLIP(*v);
+                *v = PAK_I32_FLIP(*v);
             } break;
 
-            case ELK_RADIX_SORT_INT16:
+            case PAK_RADIX_SORT_INT16:
             {
                 /* Flip bits so two's complement signed integers sort correctly. */
                 u16 *v = (u16 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_I16_FLIP(*v);
+                *v = PAK_I16_FLIP(*v);
             } break;
 
-            case ELK_RADIX_SORT_INT8:
+            case PAK_RADIX_SORT_INT8:
             {
                 /* Flip bits so two's complement signed integers sort correctly. */
                 u8 *v = (u8 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_I8_FLIP(*v);
+                *v = PAK_I8_FLIP(*v);
             } break;
 
             /* Fall through without doing anything. */
-            case ELK_RADIX_SORT_UINT64:
-            case ELK_RADIX_SORT_UINT32:
-            case ELK_RADIX_SORT_UINT16:
-            case ELK_RADIX_SORT_UINT8: {}
+            case PAK_RADIX_SORT_UINT64:
+            case PAK_RADIX_SORT_UINT32:
+            case PAK_RADIX_SORT_UINT16:
+            case PAK_RADIX_SORT_UINT8: {}
         }
     }
 }
 
 static inline void
-elk_radix_post_sort_transform(void *buffer, size num, size offset, size stride, ElkRadixSortByType sort_type)
+pak_radix_post_sort_transform(void *buffer, size num, size offset, size stride, PakRadixSortByType sort_type)
 {
     Assert(
-           sort_type == ELK_RADIX_SORT_UINT64 || sort_type == ELK_RADIX_SORT_INT64 || sort_type == ELK_RADIX_SORT_F64
-        || sort_type == ELK_RADIX_SORT_UINT32 || sort_type == ELK_RADIX_SORT_INT32 || sort_type == ELK_RADIX_SORT_F32
-        || sort_type == ELK_RADIX_SORT_UINT16 || sort_type == ELK_RADIX_SORT_INT16
-        || sort_type == ELK_RADIX_SORT_UINT8  || sort_type == ELK_RADIX_SORT_INT8
+           sort_type == PAK_RADIX_SORT_UINT64 || sort_type == PAK_RADIX_SORT_INT64 || sort_type == PAK_RADIX_SORT_F64
+        || sort_type == PAK_RADIX_SORT_UINT32 || sort_type == PAK_RADIX_SORT_INT32 || sort_type == PAK_RADIX_SORT_F32
+        || sort_type == PAK_RADIX_SORT_UINT16 || sort_type == PAK_RADIX_SORT_INT16
+        || sort_type == PAK_RADIX_SORT_UINT8  || sort_type == PAK_RADIX_SORT_INT8
     );
 
     for(size i = 0; i < num; ++i)
     {
         switch(sort_type)
         {
-            case ELK_RADIX_SORT_F64:
+            case PAK_RADIX_SORT_F64:
             {
                 /* Flip bits so doubles sort correctly. */
                 u64 *v = (u64 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_F64_FLIP_BACK(*v);
+                *v = PAK_F64_FLIP_BACK(*v);
             } break;
 
-            case ELK_RADIX_SORT_INT64:
+            case PAK_RADIX_SORT_INT64:
             {
                 /* Flip bits so two's complement signed integers sort correctly. */
                 u64 *v = (u64 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_I64_FLIP_BACK(*v);
+                *v = PAK_I64_FLIP_BACK(*v);
             } break;
 
-            case ELK_RADIX_SORT_F32:
+            case PAK_RADIX_SORT_F32:
             {
                 /* Flip bits so doubles sort correctly. */
                 u32 *v = (u32 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_F32_FLIP_BACK(*v);
+                *v = PAK_F32_FLIP_BACK(*v);
             } break;
 
-            case ELK_RADIX_SORT_INT32:
+            case PAK_RADIX_SORT_INT32:
             {
                 /* Flip bits so two's complement signed integers sort correctly. */
                 u32 *v = (u32 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_I32_FLIP_BACK(*v);
+                *v = PAK_I32_FLIP_BACK(*v);
             } break;
 
-            case ELK_RADIX_SORT_INT16:
+            case PAK_RADIX_SORT_INT16:
             {
                 /* Flip bits so two's complement signed integers sort correctly. */
                 u16 *v = (u16 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_I16_FLIP_BACK(*v);
+                *v = PAK_I16_FLIP_BACK(*v);
             } break;
 
-            case ELK_RADIX_SORT_INT8:
+            case PAK_RADIX_SORT_INT8:
             {
                 /* Flip bits so two's complement signed integers sort correctly. */
                 u8 *v = (u8 *)((byte *)buffer + offset + i * stride);
-                *v = ELK_I8_FLIP_BACK(*v);
+                *v = PAK_I8_FLIP_BACK(*v);
             } break;
 
             /* Fall through with no-op */
-            case ELK_RADIX_SORT_UINT64:
-            case ELK_RADIX_SORT_UINT32:
-            case ELK_RADIX_SORT_UINT16:
-            case ELK_RADIX_SORT_UINT8: {}
+            case PAK_RADIX_SORT_UINT64:
+            case PAK_RADIX_SORT_UINT32:
+            case PAK_RADIX_SORT_UINT16:
+            case PAK_RADIX_SORT_UINT8: {}
         }
     }
 }
 
 static inline void
-elk_radix_sort_8(void *buffer, size num, size offset, size stride, void *scratch, ElkSortOrder order)
+pak_radix_sort_8(void *buffer, size num, size offset, size stride, void *scratch, PakSortOrder order)
 {
     i64 counts[256] = {0};
 
@@ -1141,7 +1141,7 @@ elk_radix_sort_8(void *buffer, size num, size offset, size stride, void *scratch
     }
 
     /* Sum the histograms. */
-    if(order == ELK_SORT_ASCENDING)
+    if(order == PAK_SORT_ASCENDING)
     {
         for(size i = 1; i < 256; ++i)
         {
@@ -1173,7 +1173,7 @@ elk_radix_sort_8(void *buffer, size num, size offset, size stride, void *scratch
 }
 
 static inline void
-elk_radix_sort_16(void *buffer, size num, size offset, size stride, void *scratch, ElkSortOrder order)
+pak_radix_sort_16(void *buffer, size num, size offset, size stride, void *scratch, PakSortOrder order)
 {
     i64 counts[256][2] = {0};
     i32 skips[2] = {1, 1};
@@ -1208,7 +1208,7 @@ elk_radix_sort_16(void *buffer, size num, size offset, size stride, void *scratc
     }
 
     /* Sum the histograms. */
-    if(order == ELK_SORT_ASCENDING)
+    if(order == PAK_SORT_ASCENDING)
     {
         for(size i = 1; i < 256; ++i)
         {
@@ -1261,7 +1261,7 @@ elk_radix_sort_16(void *buffer, size num, size offset, size stride, void *scratc
 }
 
 static inline void
-elk_radix_sort_32(void *buffer, size num, size offset, size stride, void *scratch, ElkSortOrder order)
+pak_radix_sort_32(void *buffer, size num, size offset, size stride, void *scratch, PakSortOrder order)
 {
     i64 counts[256][4] = {0};
     i32 skips[4] = {1, 1, 1, 1};
@@ -1306,7 +1306,7 @@ elk_radix_sort_32(void *buffer, size num, size offset, size stride, void *scratc
     }
 
     /* Sum the histograms. */
-    if(order == ELK_SORT_ASCENDING)
+    if(order == PAK_SORT_ASCENDING)
     {
         for(size i = 1; i < 256; ++i)
         {
@@ -1363,7 +1363,7 @@ elk_radix_sort_32(void *buffer, size num, size offset, size stride, void *scratc
 }
 
 static inline void
-elk_radix_sort_64(void *buffer, size num, size offset, size stride, void *scratch, ElkSortOrder order)
+pak_radix_sort_64(void *buffer, size num, size offset, size stride, void *scratch, PakSortOrder order)
 {
     i64 counts[256][8] = {0};
     i32 skips[8] = {1, 1, 1, 1, 1, 1, 1, 1};
@@ -1428,7 +1428,7 @@ elk_radix_sort_64(void *buffer, size num, size offset, size stride, void *scratc
     }
 
     /* Sum the histograms. */
-    if(order == ELK_SORT_ASCENDING)
+    if(order == PAK_SORT_ASCENDING)
     {
         for(size i = 1; i < 256; ++i)
         {
@@ -1493,42 +1493,42 @@ elk_radix_sort_64(void *buffer, size num, size offset, size stride, void *scratc
 }
 
 static inline void
-elk_radix_sort(void *buffer, size num, size offset, size stride, void *scratch, ElkRadixSortByType sort_type, ElkSortOrder order)
+pak_radix_sort(void *buffer, size num, size offset, size stride, void *scratch, PakRadixSortByType sort_type, PakSortOrder order)
 {
-    elk_radix_pre_sort_transform(buffer, num, offset, stride, sort_type);
+    pak_radix_pre_sort_transform(buffer, num, offset, stride, sort_type);
 
     switch(sort_type)
     {
-        case ELK_RADIX_SORT_UINT64:
-        case ELK_RADIX_SORT_INT64:
-        case ELK_RADIX_SORT_F64:
+        case PAK_RADIX_SORT_UINT64:
+        case PAK_RADIX_SORT_INT64:
+        case PAK_RADIX_SORT_F64:
         {
-            elk_radix_sort_64(buffer, num, offset, stride, scratch, order);
+            pak_radix_sort_64(buffer, num, offset, stride, scratch, order);
         } break;
 
-        case ELK_RADIX_SORT_UINT32:
-        case ELK_RADIX_SORT_INT32:
-        case ELK_RADIX_SORT_F32:
+        case PAK_RADIX_SORT_UINT32:
+        case PAK_RADIX_SORT_INT32:
+        case PAK_RADIX_SORT_F32:
         {
-            elk_radix_sort_32(buffer, num, offset, stride, scratch, order);
+            pak_radix_sort_32(buffer, num, offset, stride, scratch, order);
         } break;
 
-        case ELK_RADIX_SORT_UINT16:
-        case ELK_RADIX_SORT_INT16:
+        case PAK_RADIX_SORT_UINT16:
+        case PAK_RADIX_SORT_INT16:
         {
-            elk_radix_sort_16(buffer, num, offset, stride, scratch, order);
+            pak_radix_sort_16(buffer, num, offset, stride, scratch, order);
         } break;
 
-        case ELK_RADIX_SORT_UINT8:
-        case ELK_RADIX_SORT_INT8:
+        case PAK_RADIX_SORT_UINT8:
+        case PAK_RADIX_SORT_INT8:
         {
-            elk_radix_sort_8(buffer, num, offset, stride, scratch, order);
+            pak_radix_sort_8(buffer, num, offset, stride, scratch, order);
         } break;
 
         default: Panic();
     }
     
-    elk_radix_post_sort_transform(buffer, num, offset, stride, sort_type);
+    pak_radix_post_sort_transform(buffer, num, offset, stride, sort_type);
 }
 
 #endif

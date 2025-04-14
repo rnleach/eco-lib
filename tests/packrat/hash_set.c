@@ -27,7 +27,7 @@ static b32 str_eq(void const *left, void const *right)
 #define NUM_SET_TEST_STRINGS  (sizeof(some_strings_hash_set_tests) / sizeof(some_strings_hash_set_tests[0]))
 
 static void
-test_elk_hash_set(void)
+test_pak_hash_set(void)
 {
     ElkStr strs[NUM_SET_TEST_STRINGS] = {0};
     for(i32 i = 0; i < NUM_SET_TEST_STRINGS; ++i)
@@ -40,31 +40,31 @@ test_elk_hash_set(void)
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);
 
-    ElkHashSet set_ = elk_hash_set_create(2, simple_str_hash, str_eq, arena);
-    ElkHashSet *set = &set_;
+    PakHashSet set_ = pak_hash_set_create(2, simple_str_hash, str_eq, arena);
+    PakHashSet *set = &set_;
     for(i32 i = 0; i < NUM_SET_TEST_STRINGS; ++i)
     {
-        ElkStr *str = elk_hash_set_insert(set, &strs[i]);
+        ElkStr *str = pak_hash_set_insert(set, &strs[i]);
         Assert(str == &strs[i]);
     }
 
     for(i32 i = 0; i < NUM_SET_TEST_STRINGS; ++i)
     {
-        ElkStr *str = elk_hash_set_lookup(set, &strs[i]);
+        ElkStr *str = pak_hash_set_lookup(set, &strs[i]);
         Assert(str == &strs[i]);
     }
 
     Assert(pak_len(set) == NUM_SET_TEST_STRINGS);
 
     ElkStr not_in_set = elk_str_from_cstring("green beans");
-    ElkStr *str = elk_hash_set_lookup(set, &not_in_set);
+    ElkStr *str = pak_hash_set_lookup(set, &not_in_set);
     Assert(str == NULL);
 
-    elk_hash_set_destroy(set);
+    pak_hash_set_destroy(set);
 }
 
 static void
-test_elk_hash_set_iter(void)
+test_pak_hash_set_iter(void)
 {
     ElkStr strs[NUM_SET_TEST_STRINGS] = {0};
     for(i32 i = 0; i < NUM_SET_TEST_STRINGS; ++i)
@@ -77,16 +77,16 @@ test_elk_hash_set_iter(void)
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);
 
-    ElkHashSet set_ = elk_hash_set_create(2, simple_str_hash, str_eq, arena);
-    ElkHashSet *set = &set_;
+    PakHashSet set_ = pak_hash_set_create(2, simple_str_hash, str_eq, arena);
+    PakHashSet *set = &set_;
     for(i32 i = 0; i < NUM_SET_TEST_STRINGS; ++i)
     {
-        ElkStr *str = elk_hash_set_insert(set, &strs[i]);
+        ElkStr *str = pak_hash_set_insert(set, &strs[i]);
         Assert(str == &strs[i]);
     }
 
-    ElkHashSetIter iter = elk_hash_set_value_iter(set);
-    ElkStr *next = elk_hash_set_value_iter_next(set, &iter);
+    PakHashSetIter iter = pak_hash_set_value_iter(set);
+    ElkStr *next = pak_hash_set_value_iter_next(set, &iter);
     i32 found_count = 0;
     while(next)
     {
@@ -103,19 +103,19 @@ test_elk_hash_set_iter(void)
 
         Assert(found);
 
-        next = elk_hash_set_value_iter_next(set, &iter);
+        next = pak_hash_set_value_iter_next(set, &iter);
     }
     Assert(found_count == NUM_SET_TEST_STRINGS);
 
-    elk_hash_set_destroy(set);
+    pak_hash_set_destroy(set);
 }
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                       All tests
  *-------------------------------------------------------------------------------------------------------------------------*/
 void
-elk_hash_set_tests()
+pak_hash_set_tests()
 {
-    test_elk_hash_set();
-    test_elk_hash_set_iter();
+    test_pak_hash_set();
+    test_pak_hash_set_iter();
 }

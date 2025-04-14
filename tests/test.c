@@ -22,12 +22,8 @@ main(int argc, char *argv[])
     elk_parse_tests();
     elk_arena_tests();
     elk_pool_tests();
-    elk_string_interner_tests();
     elk_queue_ledger_tests();
     elk_array_ledger_tests();
-    elk_hash_table_tests();
-    elk_hash_set_tests();
-    elk_sort_tests();
     elk_csv_tests();
     COY_END_PROFILE(ap);
     fprintf(stderr, ".complete.\n");
@@ -71,6 +67,14 @@ main(int argc, char *argv[])
     fprintf(stderr, ".complete.\n");
 
     /* Packrat Tests ----------------------------------------------------------------------------*/
+    fprintf(stderr, "packrat tests..");
+    ap = COY_START_PROFILE_BLOCK("packrat tests");
+    pak_string_interner_tests();
+    pak_hash_table_tests();
+    pak_hash_set_tests();
+    pak_sort_tests();
+    COY_END_PROFILE(ap);
+    fprintf(stderr, ".complete.\n");
 
     /* Done with Tests --------------------------------------------------------------------------*/
     coy_profile_end();

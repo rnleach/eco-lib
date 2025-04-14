@@ -39,13 +39,13 @@ print_test_structs(TestStruct *list, size num)
 }
 
 static inline void
-test_ordering(TestStruct *list, size num, size offset, ElkRadixSortByType cmp_type, ElkSortOrder order)
+test_ordering(TestStruct *list, size num, size offset, PakRadixSortByType cmp_type, PakSortOrder order)
 {
     byte *base = (byte *)list + offset;
 
-    size start_idx = order == ELK_SORT_ASCENDING ? 0 : num - 1;
-    size end_idx = order == ELK_SORT_ASCENDING ? num - 1 : 0;
-    size delta = order == ELK_SORT_ASCENDING ? 1 : -1;
+    size start_idx = order == PAK_SORT_ASCENDING ? 0 : num - 1;
+    size end_idx = order == PAK_SORT_ASCENDING ? num - 1 : 0;
+    size delta = order == PAK_SORT_ASCENDING ? 1 : -1;
 
     u64 u64_0;
     i64 i64_0;
@@ -61,16 +61,16 @@ test_ordering(TestStruct *list, size num, size offset, ElkRadixSortByType cmp_ty
     byte *ptr = base + start_idx * sizeof(*list);
     switch(cmp_type)
     {
-        case ELK_RADIX_SORT_UINT64: u64_0 = *(u64 *)ptr; break;
-        case ELK_RADIX_SORT_INT64:  i64_0 = *(i64 *)ptr; break;
-        case ELK_RADIX_SORT_F64:    f64_0 = *(f64 *)ptr; break;
-        case ELK_RADIX_SORT_UINT32: u32_0 = *(u32 *)ptr; break;
-        case ELK_RADIX_SORT_INT32:  i32_0 = *(i32 *)ptr; break;
-        case ELK_RADIX_SORT_F32:    f32_0 = *(f32 *)ptr; break;
-        case ELK_RADIX_SORT_UINT16: u16_0 = *(u16 *)ptr; break;
-        case ELK_RADIX_SORT_INT16:  i16_0 = *(i16 *)ptr; break;
-        case ELK_RADIX_SORT_UINT8:   u8_0 = *(u8 *) ptr; break;
-        case ELK_RADIX_SORT_INT8:    i8_0 = *(i8 *) ptr; break;
+        case PAK_RADIX_SORT_UINT64: u64_0 = *(u64 *)ptr; break;
+        case PAK_RADIX_SORT_INT64:  i64_0 = *(i64 *)ptr; break;
+        case PAK_RADIX_SORT_F64:    f64_0 = *(f64 *)ptr; break;
+        case PAK_RADIX_SORT_UINT32: u32_0 = *(u32 *)ptr; break;
+        case PAK_RADIX_SORT_INT32:  i32_0 = *(i32 *)ptr; break;
+        case PAK_RADIX_SORT_F32:    f32_0 = *(f32 *)ptr; break;
+        case PAK_RADIX_SORT_UINT16: u16_0 = *(u16 *)ptr; break;
+        case PAK_RADIX_SORT_INT16:  i16_0 = *(i16 *)ptr; break;
+        case PAK_RADIX_SORT_UINT8:   u8_0 = *(u8 *) ptr; break;
+        case PAK_RADIX_SORT_INT8:    i8_0 = *(i8 *) ptr; break;
     }
 
     start_idx += delta;
@@ -80,21 +80,21 @@ test_ordering(TestStruct *list, size num, size offset, ElkRadixSortByType cmp_ty
         ptr = base + i * sizeof(*list);
         switch(cmp_type)
         {
-            case ELK_RADIX_SORT_UINT64:
+            case PAK_RADIX_SORT_UINT64:
             {
                 u64 u64_1 = *(u64 *)ptr;
                 Assert(u64_0 <= u64_1);
                 u64_0 = u64_1;
             } break;
 
-            case ELK_RADIX_SORT_INT64:
+            case PAK_RADIX_SORT_INT64:
             {
                 i64 i64_1 = *(i64 *)ptr;
                 Assert(i64_0 <= i64_1);
                 i64_0 = i64_1;
             } break;
 
-            case ELK_RADIX_SORT_F64:
+            case PAK_RADIX_SORT_F64:
             {
                 f64 f64_1 = *(f64 *)ptr;
                 if(!(isnan(f64_0) || isnan(f64_1)))
@@ -104,21 +104,21 @@ test_ordering(TestStruct *list, size num, size offset, ElkRadixSortByType cmp_ty
                 f64_0 = f64_1;
             } break;
 
-            case ELK_RADIX_SORT_UINT32:
+            case PAK_RADIX_SORT_UINT32:
             {
                 u32 u32_1 = *(u32 *)ptr;
                 Assert(u32_0 <= u32_1);
                 u32_0 = u32_1;
             } break;
 
-            case ELK_RADIX_SORT_INT32:
+            case PAK_RADIX_SORT_INT32:
             {
                 i32 i32_1 = *(i32 *)ptr;
                 Assert(i32_0 <= i32_1);
                 i32_0 = i32_1;
             } break;
 
-            case ELK_RADIX_SORT_F32:
+            case PAK_RADIX_SORT_F32:
             {
                 f32 f32_1 = *(f32 *)ptr;
                 if(!(isnan(f32_0) || isnan(f32_1)))
@@ -128,28 +128,28 @@ test_ordering(TestStruct *list, size num, size offset, ElkRadixSortByType cmp_ty
                 f32_0 = f32_1;
             } break;
 
-            case ELK_RADIX_SORT_UINT16:
+            case PAK_RADIX_SORT_UINT16:
             {
                 u16 u16_1 = *(u16 *)ptr;
                 Assert(u16_0 <= u16_1);
                 u16_0 = u16_1;
             } break;
 
-            case ELK_RADIX_SORT_INT16:
+            case PAK_RADIX_SORT_INT16:
             {
                 i16 i16_1 = *(i16 *)ptr;
                 Assert(i16_0 <= i16_1);
                 i16_0 = i16_1;
             } break;
 
-            case ELK_RADIX_SORT_UINT8:
+            case PAK_RADIX_SORT_UINT8:
             {
                 u8 u8_1 = *(u8 *)ptr;
                 Assert(u8_0 <= u8_1);
                 u8_0 = u8_1;
             } break;
 
-            case ELK_RADIX_SORT_INT8:
+            case PAK_RADIX_SORT_INT8:
             {
                 i8 i8_1 = *(i8 *)ptr;
                 Assert(i8_0 <= i8_1);
@@ -162,7 +162,7 @@ test_ordering(TestStruct *list, size num, size offset, ElkRadixSortByType cmp_ty
 #define ARRAY_LEN(X) (sizeof(X) / sizeof(X[0]))
 
 #define TEST(member, mode, order, desc)                                                                                     \
-    elk_radix_sort(test_data, ARRAY_LEN(test_data), offsetof(TestStruct, member), stride, scratch, mode, order);                \
+    pak_radix_sort(test_data, ARRAY_LEN(test_data), offsetof(TestStruct, member), stride, scratch, mode, order);                \
     /*                                                                                                                      \
     printf("\nSort "#order" by '"#member"', "desc" member.\n");                                                             \
     print_test_structs(test_data, ARRAY_LEN(test_data));                                                                    \
@@ -170,7 +170,7 @@ test_ordering(TestStruct *list, size num, size offset, ElkRadixSortByType cmp_ty
     test_ordering(test_data, ARRAY_LEN(test_data), offsetof(TestStruct, member), mode, order);
 
 static inline void
-elk_radix_sort_test(void)
+pak_radix_sort_test(void)
 {
     TestStruct test_data[] = 
     {
@@ -194,35 +194,35 @@ elk_radix_sort_test(void)
     print_test_structs(test_data, ARRAY_LEN(test_data));
 #endif
 
-    TEST(a, ELK_RADIX_SORT_UINT64, ELK_SORT_ASCENDING,  "first");
-    TEST(a, ELK_RADIX_SORT_UINT64, ELK_SORT_DESCENDING, "first");
+    TEST(a, PAK_RADIX_SORT_UINT64, PAK_SORT_ASCENDING,  "first");
+    TEST(a, PAK_RADIX_SORT_UINT64, PAK_SORT_DESCENDING, "first");
 
-    TEST(b, ELK_RADIX_SORT_INT64,  ELK_SORT_ASCENDING,  "second");
-    TEST(b, ELK_RADIX_SORT_INT64,  ELK_SORT_DESCENDING, "second");
+    TEST(b, PAK_RADIX_SORT_INT64,  PAK_SORT_ASCENDING,  "second");
+    TEST(b, PAK_RADIX_SORT_INT64,  PAK_SORT_DESCENDING, "second");
 
-    TEST(c, ELK_RADIX_SORT_F64,    ELK_SORT_ASCENDING,  "third");
-    TEST(c, ELK_RADIX_SORT_F64,    ELK_SORT_DESCENDING, "third");
+    TEST(c, PAK_RADIX_SORT_F64,    PAK_SORT_ASCENDING,  "third");
+    TEST(c, PAK_RADIX_SORT_F64,    PAK_SORT_DESCENDING, "third");
 
-    TEST(d, ELK_RADIX_SORT_UINT32, ELK_SORT_ASCENDING,  "fourth");
-    TEST(d, ELK_RADIX_SORT_UINT32, ELK_SORT_DESCENDING, "fourth");
+    TEST(d, PAK_RADIX_SORT_UINT32, PAK_SORT_ASCENDING,  "fourth");
+    TEST(d, PAK_RADIX_SORT_UINT32, PAK_SORT_DESCENDING, "fourth");
 
-    TEST(e, ELK_RADIX_SORT_INT32,  ELK_SORT_ASCENDING,  "fifth");
-    TEST(e, ELK_RADIX_SORT_INT32,  ELK_SORT_DESCENDING, "fifth");
+    TEST(e, PAK_RADIX_SORT_INT32,  PAK_SORT_ASCENDING,  "fifth");
+    TEST(e, PAK_RADIX_SORT_INT32,  PAK_SORT_DESCENDING, "fifth");
 
-    TEST(f, ELK_RADIX_SORT_F32,    ELK_SORT_ASCENDING,  "sixth");
-    TEST(f, ELK_RADIX_SORT_F32,    ELK_SORT_DESCENDING, "sixth");
+    TEST(f, PAK_RADIX_SORT_F32,    PAK_SORT_ASCENDING,  "sixth");
+    TEST(f, PAK_RADIX_SORT_F32,    PAK_SORT_DESCENDING, "sixth");
 
-    TEST(g, ELK_RADIX_SORT_UINT16, ELK_SORT_ASCENDING,  "seventh");
-    TEST(g, ELK_RADIX_SORT_UINT16, ELK_SORT_DESCENDING, "seventh");
+    TEST(g, PAK_RADIX_SORT_UINT16, PAK_SORT_ASCENDING,  "seventh");
+    TEST(g, PAK_RADIX_SORT_UINT16, PAK_SORT_DESCENDING, "seventh");
 
-    TEST(h, ELK_RADIX_SORT_INT16,  ELK_SORT_ASCENDING,  "eighth");
-    TEST(h, ELK_RADIX_SORT_INT16,  ELK_SORT_DESCENDING, "eighth");
+    TEST(h, PAK_RADIX_SORT_INT16,  PAK_SORT_ASCENDING,  "eighth");
+    TEST(h, PAK_RADIX_SORT_INT16,  PAK_SORT_DESCENDING, "eighth");
 
-    TEST(i, ELK_RADIX_SORT_UINT8,  ELK_SORT_ASCENDING,  "ninth");
-    TEST(i, ELK_RADIX_SORT_UINT8,  ELK_SORT_DESCENDING, "ninth");
+    TEST(i, PAK_RADIX_SORT_UINT8,  PAK_SORT_ASCENDING,  "ninth");
+    TEST(i, PAK_RADIX_SORT_UINT8,  PAK_SORT_DESCENDING, "ninth");
 
-    TEST(j, ELK_RADIX_SORT_INT8,   ELK_SORT_ASCENDING,  "tenth");
-    TEST(j, ELK_RADIX_SORT_INT8,   ELK_SORT_DESCENDING, "tenth");
+    TEST(j, PAK_RADIX_SORT_INT8,   PAK_SORT_ASCENDING,  "tenth");
+    TEST(j, PAK_RADIX_SORT_INT8,   PAK_SORT_DESCENDING, "tenth");
 }
 
 #define NUM_ROWS 1000
@@ -231,7 +231,7 @@ static f64 test_array[NUM_ROWS * NUM_COLS] = {0};
 static f64 test_array_scratch[NUM_ROWS * NUM_COLS] = {0};
 
 static inline void
-elk_radix_sort_2darray_test(void)
+pak_radix_sort_2darray_test(void)
 {
     ElkRandomState state = elk_random_state_create(123456);
 
@@ -252,13 +252,13 @@ elk_radix_sort_2darray_test(void)
 
 
     size stride = NUM_COLS * sizeof(test_array[0]);
-    ElkRadixSortByType type = ELK_RADIX_SORT_F64;
-    ElkSortOrder order = ELK_SORT_ASCENDING;
+    PakRadixSortByType type = PAK_RADIX_SORT_F64;
+    PakSortOrder order = PAK_SORT_ASCENDING;
 
     for(size c = 0; c < NUM_COLS; ++c)
     {
         size offset = c * sizeof(test_array[0]);
-        elk_radix_sort(test_array, NUM_ROWS, offset, stride, test_array_scratch, type, order);
+        pak_radix_sort(test_array, NUM_ROWS, offset, stride, test_array_scratch, type, order);
 
         for(size r = 1; r < NUM_ROWS; ++r)
         {
@@ -271,10 +271,10 @@ elk_radix_sort_2darray_test(void)
  *                                                       All tests
  *-------------------------------------------------------------------------------------------------------------------------*/
 void
-elk_sort_tests(void)
+pak_sort_tests(void)
 {
-    elk_radix_sort_test();
-    elk_radix_sort_2darray_test();
+    pak_radix_sort_test();
+    pak_radix_sort_2darray_test();
 }
 
 #pragma warning(pop)

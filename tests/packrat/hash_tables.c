@@ -28,8 +28,8 @@ test_elk_str_table(void)
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);
 
-    ElkStrMap map_ = elk_str_map_create(2, arena); // Use a crazy small size_exp to force it to grow, this IS a test!
-    ElkStrMap *map = &map_;
+    PakStrMap map_ = pak_str_map_create(2, arena); // Use a crazy small size_exp to force it to grow, this IS a test!
+    PakStrMap *map = &map_;
     Assert(map);
 
     // Fill the map
@@ -40,14 +40,14 @@ test_elk_str_table(void)
         values[i] = i;
         values2[i] = i; // We'll use this later!
         
-        i64 *vptr = elk_str_map_insert(map, strs[i], &values[i]);
+        i64 *vptr = pak_str_map_insert(map, strs[i], &values[i]);
         Assert(vptr == &values[i]);
     }
 
     // Now see if we get the right ones back out!
     for (size i = 0; i < NUM_TEST_STRINGS; ++i) 
     {
-        i64 *vptr = elk_str_map_lookup(map, strs[i]);
+        i64 *vptr = pak_str_map_lookup(map, strs[i]);
         Assert(vptr == &values[i]);
         Assert(*vptr == i);
     }
@@ -55,12 +55,12 @@ test_elk_str_table(void)
     // Fill the map with NEW values
     for (size i = 0; i < NUM_TEST_STRINGS; ++i) 
     {
-        i64 *vptr = elk_str_map_insert(map, strs[i], &values2[i]);
+        i64 *vptr = pak_str_map_insert(map, strs[i], &values2[i]);
         Assert(vptr == &values[i]); // should get the old value pointer back
         Assert(vptr != &values2[i]); // should not point at the pointer we passed in, because we replaced a value
     }
 
-    elk_str_map_destroy(map);
+    pak_str_map_destroy(map);
 }
 
 static void
@@ -76,8 +76,8 @@ test_elk_str_key_iterator(void)
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);
 
-    ElkStrMap map_ = elk_str_map_create(2, arena); // Use a crazy small size_exp to force it to grow, this IS a test!
-    ElkStrMap *map = &map_;
+    PakStrMap map_ = pak_str_map_create(2, arena); // Use a crazy small size_exp to force it to grow, this IS a test!
+    PakStrMap *map = &map_;
     Assert(map);
 
     // Fill the map
@@ -87,17 +87,17 @@ test_elk_str_key_iterator(void)
         strs[i] = elk_str_from_cstring(str);
         values[i] = i;
         
-        i64 *vptr = elk_str_map_insert(map, strs[i], &values[i]);
+        i64 *vptr = pak_str_map_insert(map, strs[i], &values[i]);
         Assert(vptr == &values[i]);
     }
 
-    ElkStrMapKeyIter iter = elk_str_map_key_iter(map);
+    PakStrMapKeyIter iter = pak_str_map_key_iter(map);
 
     ElkStr key = {0};
     i32 key_count = 0;
     do
     {
-        key = elk_str_map_key_iter_next(map, &iter);
+        key = pak_str_map_key_iter_next(map, &iter);
         if(key.start) {
             key_count  += 1;
             //printf("%p %s\n", key.start, key.start); 
@@ -107,7 +107,7 @@ test_elk_str_key_iterator(void)
 
     Assert(key_count  == NUM_TEST_STRINGS);
 
-    elk_str_map_destroy(map);
+    pak_str_map_destroy(map);
 }
 
 static void
@@ -123,8 +123,8 @@ test_elk_str_handle_iterator(void)
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);
 
-    ElkStrMap map_ = elk_str_map_create(2, arena); // Use a crazy small size_exp to force it to grow, this IS a test!
-    ElkStrMap *map = &map_;
+    PakStrMap map_ = pak_str_map_create(2, arena); // Use a crazy small size_exp to force it to grow, this IS a test!
+    PakStrMap *map = &map_;
     Assert(map);
 
     // Fill the map
@@ -134,17 +134,17 @@ test_elk_str_handle_iterator(void)
         strs[i] = elk_str_from_cstring(str);
         values[i] = i;
         
-        i64 *vptr = elk_str_map_insert(map, strs[i], &values[i]);
+        i64 *vptr = pak_str_map_insert(map, strs[i], &values[i]);
         Assert(vptr == &values[i]);
     }
 
-    ElkStrMapHandleIter iter = elk_str_map_handle_iter(map);
+    PakStrMapHandleIter iter = pak_str_map_handle_iter(map);
 
-    ElkStrMapHandle handle = {0};
+    PakStrMapHandle handle = {0};
     i32 key_count = 0;
     do
     {
-        handle = elk_str_map_handle_iter_next(map, &iter);
+        handle = pak_str_map_handle_iter_next(map, &iter);
         if(handle.key.start) {
             key_count  += 1;
             //printf("%p %s\n", handle.key.start, handle.key.start); 
@@ -154,7 +154,7 @@ test_elk_str_handle_iterator(void)
 
     Assert(key_count  == NUM_TEST_STRINGS);
 
-    elk_str_map_destroy(map);
+    pak_str_map_destroy(map);
 }
 
 static u64 
@@ -173,7 +173,7 @@ int64_eq(void const *left, void const *right)
 
 #define NUM_KEYS 20
 static void
-test_elk_hash_table(void)
+test_pak_hash_table(void)
 {
     ElkTime keys[NUM_KEYS] = {0};
     i64 values[NUM_KEYS] = {0};
@@ -194,35 +194,35 @@ test_elk_hash_table(void)
     elk_static_arena_create(arena, sizeof(buffer), buffer);
 
     // Fill the hashmap
-    ElkHashMap map_ = elk_hash_map_create(2, id_hash, int64_eq, arena);
-    ElkHashMap *map = &map_;
+    PakHashMap map_ = pak_hash_map_create(2, id_hash, int64_eq, arena);
+    PakHashMap *map = &map_;
     for(i32 i = 0; i < NUM_KEYS; ++i)
     {
-        i64 *vptr = elk_hash_map_insert(map, &keys[i], &values[i]);
+        i64 *vptr = pak_hash_map_insert(map, &keys[i], &values[i]);
         Assert(vptr == &values[i]);
     }
 
     // check the values
     for(i32 i = 0; i < NUM_KEYS; ++i)
     {
-        i64 *vptr = elk_hash_map_lookup(map, &keys[i]);
+        i64 *vptr = pak_hash_map_lookup(map, &keys[i]);
         Assert(vptr == &values[i]);
     }
 
     // Fill the hashmap with something else
     for(i32 i = 0; i < NUM_KEYS; ++i)
     {
-        i64 *vptr = elk_hash_map_insert(map, &keys[i], &values2[i]);
+        i64 *vptr = pak_hash_map_insert(map, &keys[i], &values2[i]);
         Assert(vptr == &values[i]);
         Assert(vptr != &values2[i]);
     }
 
     // Clean up
-    elk_hash_map_destroy(map);
+    pak_hash_map_destroy(map);
 }
 
 static void
-test_elk_hash_key_iterator(void)
+test_pak_hash_key_iterator(void)
 {
     ElkTime keys[NUM_KEYS] = {0};
     i64 values[NUM_KEYS] = {0};
@@ -241,21 +241,21 @@ test_elk_hash_key_iterator(void)
     elk_static_arena_create(arena, sizeof(buffer), buffer);
 
     // Fill the hashmap
-    ElkHashMap map_ = elk_hash_map_create(2, id_hash, int64_eq, arena);
-    ElkHashMap *map = &map_;
+    PakHashMap map_ = pak_hash_map_create(2, id_hash, int64_eq, arena);
+    PakHashMap *map = &map_;
     for(i32 i = 0; i < NUM_KEYS; ++i)
     {
-        i64 *vptr = elk_hash_map_insert(map, &keys[i], &values[i]);
+        i64 *vptr = pak_hash_map_insert(map, &keys[i], &values[i]);
         Assert(vptr == &values[i]);
     }
 
-    ElkHashMapKeyIter iter = elk_hash_map_key_iter(map);
+    PakHashMapKeyIter iter = pak_hash_map_key_iter(map);
     
     ElkTime *key = NULL;
     i32 num_keys = 0;
     do
     {
-        key = elk_hash_map_key_iter_next(map, &iter);
+        key = pak_hash_map_key_iter_next(map, &iter);
         if(key) {
             num_keys += 1;
             //printf("%p %lld\n", key, *key); 
@@ -266,7 +266,7 @@ test_elk_hash_key_iterator(void)
     Assert(num_keys == NUM_KEYS);
     
     // Clean up
-    elk_hash_map_destroy(map);
+    pak_hash_map_destroy(map);
 }
 #undef NUM_KEYS
 
@@ -274,11 +274,11 @@ test_elk_hash_key_iterator(void)
  *                                                       All tests
  *-------------------------------------------------------------------------------------------------------------------------*/
 void
-elk_hash_table_tests()
+pak_hash_table_tests()
 {
     test_elk_str_table();
     test_elk_str_key_iterator();
     test_elk_str_handle_iterator();
-    test_elk_hash_table();
-    test_elk_hash_key_iterator();
+    test_pak_hash_table();
+    test_pak_hash_key_iterator();
 }
