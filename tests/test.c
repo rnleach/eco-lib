@@ -106,14 +106,10 @@ main(int argc, char *argv[])
 #include "elk/array_ledger.c"
 #include "elk/csv.c"
 #include "elk/fnv1a.c"
-#include "elk/hash_set.c"
-#include "elk/hash_tables.c"
 #include "elk/parse.c"
 #include "elk/pool.c"
 #include "elk/queue_ledger.c"
-#include "elk/sort.c"
 #include "elk/str.c"
-#include "elk/string_interner.c"
 #include "elk/time.c"
 
 #include "magpie/sys_memory.c"
@@ -123,4 +119,9 @@ main(int argc, char *argv[])
 #include "coyote/terminal.c"
 #include "coyote/threads.c"
 #include "coyote/time.c"
+
+#include "packrat/hash_set.c"
+#include "packrat/hash_tables.c"
+#include "packrat/sort.c"
+#include "packrat/string_interner.c"
 

@@ -54,7 +54,7 @@ test_elk_hash_set(void)
         Assert(str == &strs[i]);
     }
 
-    Assert(elk_len(set) == NUM_SET_TEST_STRINGS);
+    Assert(pak_len(set) == NUM_SET_TEST_STRINGS);
 
     ElkStr not_in_set = elk_str_from_cstring("green beans");
     ElkStr *str = elk_hash_set_lookup(set, &not_in_set);

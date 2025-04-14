@@ -23,12 +23,8 @@ void elk_str_tests(void);
 void elk_parse_tests(void);
 void elk_arena_tests(void);
 void elk_pool_tests(void);
-void elk_string_interner_tests(void);
 void elk_queue_ledger_tests(void);
 void elk_array_ledger_tests(void);
-void elk_hash_table_tests(void);
-void elk_hash_set_tests(void);
-void elk_sort_tests(void);
 void elk_csv_tests(void);
 
 void magpie_sys_memory_tests(void);
@@ -40,5 +36,10 @@ void coyote_terminal_tests(void);
 void coyote_threads_tests(void);
 
 static char const *test_data_dir = "tmp_output";
+
+void elk_string_interner_tests(void);
+void elk_hash_table_tests(void);
+void elk_hash_set_tests(void);
+void elk_sort_tests(void);
 
 #endif
