@@ -21,8 +21,6 @@ main(int argc, char *argv[])
     elk_fnv1a_tests();
     elk_str_tests();
     elk_parse_tests();
-    elk_queue_ledger_tests();
-    elk_array_ledger_tests();
     elk_csv_tests();
     COY_END_PROFILE(ap);
     fprintf(stderr, ".complete.\n");
@@ -70,6 +68,8 @@ main(int argc, char *argv[])
     /* Packrat Tests ----------------------------------------------------------------------------*/
     fprintf(stderr, "packrat tests..");
     ap = COY_START_PROFILE_BLOCK("packrat tests");
+    pak_queue_ledger_tests();
+    pak_array_ledger_tests();
     pak_string_interner_tests();
     pak_hash_table_tests();
     pak_hash_set_tests();
@@ -107,11 +107,9 @@ main(int argc, char *argv[])
 }
 
 
-#include "elk/array_ledger.c"
 #include "elk/csv.c"
 #include "elk/fnv1a.c"
 #include "elk/parse.c"
-#include "elk/queue_ledger.c"
 #include "elk/str.c"
 #include "elk/time.c"
 #include "elk/date.c"
@@ -126,6 +124,8 @@ main(int argc, char *argv[])
 #include "coyote/threads.c"
 #include "coyote/time.c"
 
+#include "packrat/array_ledger.c"
+#include "packrat/queue_ledger.c"
 #include "packrat/hash_set.c"
 #include "packrat/hash_tables.c"
 #include "packrat/sort.c"

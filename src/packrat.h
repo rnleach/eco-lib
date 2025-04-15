@@ -61,7 +61,7 @@ static inline ElkStr pak_string_interner_intern(PakStringInterner *interner, Elk
  *  efficient allocation strategy. 
  *
  *  Another advantage of this is that if you have several parallel collections (e.g. parallel arrays), you can use a single
- *  instance of a bookkeeping type (e.g. ElkQueueLedger) to track the state of all the arrays that back it. Further,
+ *  instance of a bookkeeping type (e.g. PakQueueLedger) to track the state of all the arrays that back it. Further,
  *  different collections in the parallel collections can have different sized objects.
  *
  *  Complicated memory management can be a disadvantage of the ledger approach. For instance, implementing growable
@@ -84,8 +84,61 @@ static inline ElkStr pak_string_interner_intern(PakStringInterner *interner, Elk
  *  by an array or a block of contiguous memory.
  */
 
-static size const PAK_COLLECTION_EMPTY = ELK_COLLECTION_EMPTY;
-static size const PAK_COLLECTION_FULL = ELK_COLLECTION_FULL;
+static size const PAK_COLLECTION_EMPTY = -1;
+static size const PAK_COLLECTION_FULL = -2;
+
+/*---------------------------------------------------------------------------------------------------------------------------
+ *                                                      Queue Ledger
+ *---------------------------------------------------------------------------------------------------------------------------
+ *
+ * Mind the PAK_COLLECTION_FULL and PAK_COLLECTION_EMPTY return values.
+ */
+
+typedef struct 
+{
+    size capacity;
+    size length;
+    size front;
+    size back;
+} PakQueueLedger;
+
+static inline PakQueueLedger pak_queue_ledger_create(size capacity);
+static inline b32 pak_queue_ledger_full(PakQueueLedger *queue);
+static inline b32 pak_queue_ledger_empty(PakQueueLedger *queue);
+static inline size pak_queue_ledger_push_back_index(PakQueueLedger *queue);  // index of next location to put an object
+static inline size pak_queue_ledger_pop_front_index(PakQueueLedger *queue);  // index of next location to take object
+static inline size pak_queue_ledger_peek_front_index(PakQueueLedger *queue); // index of next object, but not incremented
+static inline size pak_queue_ledger_len(PakQueueLedger const *queue);
+
+/*---------------------------------------------------------------------------------------------------------------------------
+ *                                                      Array Ledger
+ *---------------------------------------------------------------------------------------------------------------------------
+ *
+ * Mind the PAK_COLLECTION_FULL and PAK_COLLECTION_EMPTY return values.
+ */
+typedef struct 
+{
+    size capacity;
+    size length;
+} PakArrayLedger;
+
+static inline PakArrayLedger pak_array_ledger_create(size capacity);
+static inline b32 pak_array_ledger_full(PakArrayLedger *array);
+static inline b32 pak_array_ledger_empty(PakArrayLedger *array);
+static inline size pak_array_ledger_push_back_index(PakArrayLedger *array);
+static inline size pak_array_ledger_pop_back_index(PakArrayLedger *array);
+static inline size pak_array_ledger_len(PakArrayLedger const *array);
+static inline void pak_array_ledger_reset(PakArrayLedger *array);
+static inline void pak_array_ledger_set_capacity(PakArrayLedger *array, size capacity);
+
+/*---------------------------------------------------------------------------------------------------------------------------
+ *                                            Generic Macros for Collections
+ *---------------------------------------------------------------------------------------------------------------------------
+ * These macros take any collection and return a result.
+ */
+#define pak_len(x) _Generic((x),                                                                                            \
+        PakQueueLedger *: pak_queue_ledger_len,                                                                             \
+        PakArrayLedger *: pak_array_ledger_len,                                                                             
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                         
@@ -211,8 +264,8 @@ static inline void *pak_hash_set_value_iter_next(PakHashSet *set, PakHashSetIter
  * These macros take any collection and return a result.
  */
 #define pak_len(x) _Generic((x),                                                                                            \
-        ElkQueueLedger *: elk_queue_ledger_len,                                                                             \
-        ElkArrayLedger *: elk_array_ledger_len,                                                                             \
+        PakQueueLedger *: pak_queue_ledger_len,                                                                             \
+        PakArrayLedger *: pak_array_ledger_len,                                                                             \
         PakHashMap *: pak_hash_map_len,                                                                                     \
         PakStrMap *: pak_str_map_len,                                                                                       \
         PakHashSet *: pak_hash_set_len)(x)
@@ -409,6 +462,125 @@ pak_string_interner_intern(PakStringInterner *interner, ElkStr str)
             return handle->str;
         }
     }
+}
+
+static inline PakQueueLedger
+pak_queue_ledger_create(size capacity)
+{
+    return (PakQueueLedger)
+    {
+        .capacity = capacity, 
+        .length = 0,
+        .front = 0, 
+        .back = 0
+    };
+}
+
+static inline b32 
+pak_queue_ledger_full(PakQueueLedger *queue)
+{ 
+    return queue->length == queue->capacity;
+}
+
+static inline b32
+pak_queue_ledger_empty(PakQueueLedger *queue)
+{ 
+    return queue->length == 0;
+}
+
+static inline size
+pak_queue_ledger_push_back_index(PakQueueLedger *queue)
+{
+    if(pak_queue_ledger_full(queue)) { return PAK_COLLECTION_FULL; }
+
+    size idx = queue->back % queue->capacity;
+    queue->back += 1;
+    queue->length += 1;
+    return idx;
+}
+
+static inline size
+pak_queue_ledger_pop_front_index(PakQueueLedger *queue)
+{
+    if(pak_queue_ledger_empty(queue)) { return PAK_COLLECTION_EMPTY; }
+
+    size idx = queue->front % queue->capacity;
+    queue->front += 1;
+    queue->length -= 1;
+    return idx;
+}
+
+static inline size
+pak_queue_ledger_peek_front_index(PakQueueLedger *queue)
+{
+    if(queue->length == 0) { return PAK_COLLECTION_EMPTY; }
+    return queue->front % queue->capacity;
+}
+
+static inline size
+pak_queue_ledger_len(PakQueueLedger const *queue)
+{
+    return queue->length;
+}
+
+static inline PakArrayLedger
+pak_array_ledger_create(size capacity)
+{
+    Assert(capacity > 0);
+    return (PakArrayLedger)
+    {
+        .capacity = capacity,
+        .length = 0
+    };
+}
+
+static inline b32 
+pak_array_ledger_full(PakArrayLedger *array)
+{ 
+    return array->length == array->capacity;
+}
+
+static inline b32
+pak_array_ledger_empty(PakArrayLedger *array)
+{ 
+    return array->length == 0;
+}
+
+static inline size
+pak_array_ledger_push_back_index(PakArrayLedger *array)
+{
+    if(pak_array_ledger_full(array)) { return PAK_COLLECTION_FULL; }
+
+    size idx = array->length;
+    array->length += 1;
+    return idx;
+}
+
+static inline size
+pak_array_ledger_pop_back_index(PakArrayLedger *array)
+{
+    if(pak_array_ledger_empty(array)) { return PAK_COLLECTION_EMPTY; }
+
+    return --array->length;
+}
+
+static inline size
+pak_array_ledger_len(PakArrayLedger const *array)
+{
+    return array->length;
+}
+
+static inline void
+pak_array_ledger_reset(PakArrayLedger *array)
+{
+    array->length = 0;
+}
+
+static inline void
+pak_array_ledger_set_capacity(PakArrayLedger *array, size capacity)
+{
+    Assert(capacity > 0);
+    array->capacity = capacity;
 }
 
 static PakHashMap 

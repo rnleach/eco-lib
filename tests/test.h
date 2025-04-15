@@ -22,8 +22,6 @@ void elk_date_tests(void);
 void elk_fnv1a_tests(void);
 void elk_str_tests(void);
 void elk_parse_tests(void);
-void elk_queue_ledger_tests(void);
-void elk_array_ledger_tests(void);
 void elk_csv_tests(void);
 
 void magpie_sys_memory_tests(void);
@@ -38,6 +36,8 @@ void coyote_threads_tests(void);
 
 static char const *test_data_dir = "tmp_output";
 
+void pak_queue_ledger_tests(void);
+void pak_array_ledger_tests(void);
 void pak_string_interner_tests(void);
 void pak_hash_table_tests(void);
 void pak_hash_set_tests(void);
