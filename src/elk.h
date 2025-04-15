@@ -202,6 +202,15 @@ static inline ElkTimeDiff elk_time_difference(ElkTime a, ElkTime b); /* a - b */
 static inline ElkTime elk_time_from_ymd_and_hms(int year, int month, int day, int hour, int minutes, int seconds);
 static inline ElkTime elk_time_from_yd_and_hms(int year, int day_of_year, int hour, int minutes, int seconds);
 static inline ElkStructTime elk_make_struct_time(ElkTime time);
+
+/* If ElkTime has both date and time, why bother with a separate type for JUST dates? Because I can make it smaller in size
+ * so it takes up less space.
+ */
+typedef i32 ElkDate;
+typedef i32 ElkDateDiff;
+
+static inline ElkDateDiff elk_date_difference(ElkDate a, ElkDate b); /* a - b */
+static inline ElkDate elk_date_from_ymd(int year, int month, int day);
 /*---------------------------------------------------------------------------------------------------------------------------
  *
  *                                                         Memory
@@ -364,6 +373,7 @@ static inline b32 elk_str_parse_i64(ElkStr str, i64 *result);
 static inline b32 elk_str_robust_parse_f64(ElkStr str, f64 *out);
 static inline b32 elk_str_fast_parse_f64(ElkStr str, f64 *out);
 static inline b32 elk_str_parse_datetime(ElkStr str, ElkTime *out);
+static inline b32 elk_str_parse_usa_date(ElkStr str, ElkDate *out); /* MM-DD-YYYY format */
 
 #define elk_str_parse_elk_time(str, result) elk_str_parse_i64((str), (result))
 
@@ -827,6 +837,36 @@ elk_make_struct_time(ElkTime time)
         .second = second,
         .day_of_year = day_of_year,
     };
+}
+
+static inline ElkDateDiff 
+elk_date_difference(ElkDate a, ElkDate b)
+{
+    return a - b;
+}
+
+static inline ElkDate 
+elk_date_from_ymd(int year, int month, int day)
+{
+    Assert(year >= 1 && year <= INT16_MAX);
+    Assert(day >= 1 && day <= 31);
+    Assert(month >= 1 && month <= 12);
+
+    // Days in the years up to now.
+    i32 const num_leap_years_since_epoch = elk_num_leap_years_since_epoch(year);
+    ElkDate dt = (year - 1) * 365 + num_leap_years_since_epoch;
+
+    // Days in the months up to the start of this month
+    i64 const days_until_start_of_month =
+        elk_is_leap_year(year) ? sum_days_to_month[1][month] : sum_days_to_month[0][month];
+    dt += days_until_start_of_month;
+
+    // Days in the days of the month up to this one.
+    dt += (day - 1);
+
+    Assert(dt >= 0);
+
+    return dt;
 }
 
 static inline ElkStr
@@ -1414,6 +1454,26 @@ elk_str_parse_datetime(ElkStr str, ElkTime *out)
         case 13: return elk_str_parse_datetime_compact_doy(str, out);
 
         default: return false;
+    }
+
+    return false;
+}
+
+static inline b32 
+elk_str_parse_usa_date(ElkStr str, ElkDate *out)
+{
+    /* MM-DD-YYYY format */
+    i64 year = INT64_MIN;
+    i64 month = INT64_MIN;
+    i64 day = INT64_MIN;
+
+    if(
+        elk_str_parse_i64(elk_str_substr(str,  6, 4), &year    ) && 
+        elk_str_parse_i64(elk_str_substr(str,  0, 2), &month   ) &&
+        elk_str_parse_i64(elk_str_substr(str,  3, 2), &day     ))
+    {
+        *out = elk_date_from_ymd((i16)year, (i8)month, (i8)day);
+        return true;
     }
 
     return false;

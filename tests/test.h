@@ -18,6 +18,7 @@
 #include "../build/packrat.h"
 
 void elk_time_tests(void);
+void elk_date_tests(void);
 void elk_fnv1a_tests(void);
 void elk_str_tests(void);
 void elk_parse_tests(void);

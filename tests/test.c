@@ -17,6 +17,7 @@ main(int argc, char *argv[])
     fprintf(stderr, "elk tests..");
     CoyProfileAnchor ap = COY_START_PROFILE_BLOCK("elk tests");
     elk_time_tests();
+    elk_date_tests();
     elk_fnv1a_tests();
     elk_str_tests();
     elk_parse_tests();
@@ -115,6 +116,7 @@ main(int argc, char *argv[])
 #include "elk/queue_ledger.c"
 #include "elk/str.c"
 #include "elk/time.c"
+#include "elk/date.c"
 
 #include "magpie/sys_memory.c"
 
