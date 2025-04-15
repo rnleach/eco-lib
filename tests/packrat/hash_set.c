@@ -35,7 +35,7 @@ test_pak_hash_set(void)
         strs[i] = elk_str_from_cstring(some_strings_hash_set_tests[i]);
     }
 
-    byte buffer[ELK_KB(1)] = {0};
+    byte buffer[ECO_KB(1)] = {0};
     ElkStaticArena arena_i = {0};
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);
@@ -72,7 +72,7 @@ test_pak_hash_set_iter(void)
         strs[i] = elk_str_from_cstring(some_strings_hash_set_tests[i]);
     }
 
-    byte buffer[ELK_KB(1)] = {0};
+    byte buffer[ECO_KB(1)] = {0};
     ElkStaticArena arena_i = {0};
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);

@@ -30,32 +30,6 @@ void *memmove(void *dest, void const *src, size_t num_bytes);
 static inline u64 coy_time_now(void); // Get the current system time in seconds since midnight, Jan. 1 1970.
 
 /*---------------------------------------------------------------------------------------------------------------------------
- *                                                         Memory
- *---------------------------------------------------------------------------------------------------------------------------
- * Request big chunks of memory from the OS, bypassing the CRT. The system may round up your requested memory size, but it
- * will return an error instead of rounding down if there isn't enough memory.
- */
-typedef struct
-{
-    void *mem;
-    size size;
-    b32 valid;
-} CoyMemoryBlock;
-
-#define COY_KB(a) ((a) * INT64_C(1000))
-#define COY_MB(a) (COY_KB(a) * INT64_C(1000))
-#define COY_GB(a) (COY_MB(a) * INT64_C(1000))
-#define COY_TB(a) (COY_GB(a) * INT64_C(1000))
-
-#define COY_KiB(a) ((a) * (1024))
-#define COY_MiB(a) (COY_KiB(a) * INT64_C(1024))
-#define COY_GiB(a) (COY_MiB(a) * INT64_C(1024))
-#define COY_TiB(a) (COY_GiB(a) * INT64_C(1024))
-
-static inline CoyMemoryBlock coy_memory_allocate(size minimum_num_bytes);
-static inline void coy_memory_free(CoyMemoryBlock *mem);
-
-/*---------------------------------------------------------------------------------------------------------------------------
  *                                                     Files & Paths
  *---------------------------------------------------------------------------------------------------------------------------
  * Check the 'valid' member of the structs to check for errors!
@@ -87,7 +61,7 @@ static inline b32 coy_path_append(size buf_len, char path_buffer[], char const *
 
 static inline size coy_file_size(char const *filename); /* size of a file in bytes, -1 on error. */
 
-#define COY_FILE_READER_BUF_SIZE COY_KiB(32)
+#define COY_FILE_READER_BUF_SIZE ECO_KiB(32)
 typedef struct
 {
     iptr handle; // posix returns an int and windows a HANDLE (e.g. void*), this should work for all of them.
@@ -123,7 +97,7 @@ static inline ElkStr coy_file_slurp_text_dyn(char const *filename, MagDynArena *
 
 
 
-#define COY_FILE_WRITER_BUF_SIZE COY_KiB(32)
+#define COY_FILE_WRITER_BUF_SIZE ECO_KiB(32)
 typedef struct
 {
     iptr handle; // posix returns an int and windows a HANDLE (e.g. void*), this should work for all of them.

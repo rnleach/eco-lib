@@ -23,7 +23,7 @@ test_string_interner(void)
 
     ElkStr strs[sizeof(some_strings) / sizeof(some_strings[0])] = {0};
 
-    byte buffer[ELK_KB(2)] = {0};
+    byte buffer[ECO_KB(2)] = {0};
     ElkStaticArena arena_i = {0};
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);

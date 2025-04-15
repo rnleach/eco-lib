@@ -23,7 +23,7 @@ test_elk_str_table(void)
     i64 values[sizeof(some_strings_ht) / sizeof(some_strings_ht[0])] = {0};
     i64 values2[sizeof(some_strings_ht) / sizeof(some_strings_ht[0])] = {0};
 
-    byte buffer[ELK_KB(2)] = {0};
+    byte buffer[ECO_KB(2)] = {0};
     ElkStaticArena arena_i = {0};
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);
@@ -71,7 +71,7 @@ test_elk_str_key_iterator(void)
     ElkStr strs[sizeof(some_strings_ht) / sizeof(some_strings_ht[0])] = {0};
     i64 values[sizeof(some_strings_ht) / sizeof(some_strings_ht[0])] = {0};
 
-    byte buffer[ELK_KB(2)] = {0};
+    byte buffer[ECO_KB(2)] = {0};
     ElkStaticArena arena_i = {0};
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);
@@ -118,7 +118,7 @@ test_elk_str_handle_iterator(void)
     ElkStr strs[sizeof(some_strings_ht) / sizeof(some_strings_ht[0])] = {0};
     i64 values[sizeof(some_strings_ht) / sizeof(some_strings_ht[0])] = {0};
 
-    byte buffer[ELK_KB(2)] = {0};
+    byte buffer[ECO_KB(2)] = {0};
     ElkStaticArena arena_i = {0};
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);
@@ -188,7 +188,7 @@ test_pak_hash_table(void)
     }
 
     // Set up memory
-    byte buffer[ELK_KB(2)] = {0};
+    byte buffer[ECO_KB(2)] = {0};
     ElkStaticArena arena_i = {0};
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);
@@ -235,7 +235,7 @@ test_pak_hash_key_iterator(void)
     }
 
     // Set up memory
-    byte buffer[ELK_KB(2)] = {0};
+    byte buffer[ECO_KB(2)] = {0};
     ElkStaticArena arena_i = {0};
     ElkStaticArena *arena = &arena_i;
     elk_static_arena_create(arena, sizeof(buffer), buffer);

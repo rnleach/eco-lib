@@ -213,19 +213,19 @@ static inline ElkDateDiff elk_date_difference(ElkDate a, ElkDate b); /* a - b */
 static inline ElkDate elk_date_from_ymd(int year, int month, int day);
 /*---------------------------------------------------------------------------------------------------------------------------
  *
- *                                                         Memory
+ *                                                      Memory Sizes
  *
  *-------------------------------------------------------------------------------------------------------------------------*/
 
-#define ELK_KiB(a) ((a) * INT64_C(1024))
-#define ELK_MiB(a) (ELK_KiB(a) * INT64_C(1024))
-#define ELK_GiB(a) (ELK_MiB(a) * INT64_C(1024))
-#define ELK_TiB(a) (ELK_GiB(a) * INT64_C(1024))
+#define ECO_KiB(a) ((a) * INT64_C(1024))
+#define ECO_MiB(a) (ECO_KiB(a) * INT64_C(1024))
+#define ECO_GiB(a) (ECO_MiB(a) * INT64_C(1024))
+#define ECO_TiB(a) (ECO_GiB(a) * INT64_C(1024))
 
-#define ELK_KB(a) ((a) * INT64_C(1000))
-#define ELK_MB(a) (ELK_KB(a) * INT64_C(1000))
-#define ELK_GB(a) (ELK_MB(a) * INT64_C(1000))
-#define ELK_TB(a) (ELK_GB(a) * INT64_C(1000))
+#define ECO_KB(a) ((a) * INT64_C(1000))
+#define ECO_MB(a) (ECO_KB(a) * INT64_C(1000))
+#define ECO_GB(a) (ECO_MB(a) * INT64_C(1000))
+#define ECO_TB(a) (ECO_GB(a) * INT64_C(1000))
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                 Static Arena Allocator
@@ -1038,7 +1038,7 @@ elk_str_parse_i64(ElkStr str, i64 *result)
     /* Check that first the string is short enough, 16 bytes, and second that it does not cross a 4 KiB memory boundary.
      * The boundary check is needed because we can't be sure that we have access to the other page. If we don't, seg-fault!
      */
-    if(str.len <= 16 && ((((uptr)str.start + str.len) % ELK_KiB(4)) >= 16))
+    if(str.len <= 16 && ((((uptr)str.start + str.len) % ECO_KiB(4)) >= 16))
     {
         // _0_ Load, but ensure the last digit is in the last position
         u8 len = (u8)str.len;
@@ -1355,7 +1355,7 @@ elk_str_parse_datetime_long_format(ElkStr str, ElkTime *out)
 
     /* YYYY-MM-DD HH:MM:SS and YYYY-MM-DDTHH:MM:SS formats */
     /* Check to make sure we have AVX and that the string buffer won't cross a 4 KiB boundary. */
-    if(__AVX2__ && ((((uptr)str.start + str.len + 7) % ELK_KiB(4)) >= 32))
+    if(__AVX2__ && ((((uptr)str.start + str.len + 7) % ECO_KiB(4)) >= 32))
     {
         __m256i dt_string = _mm256_loadu_si256((__m256i *)start);
 

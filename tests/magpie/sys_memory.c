@@ -13,7 +13,7 @@ test_allocate_free(void)
     mag_sys_memory_free(&mem);
     Assert(!mem.valid);
 
-    mem = mag_sys_memory_allocate(MAG_KiB(1));
+    mem = mag_sys_memory_allocate(ECO_KiB(1));
     Assert(mem.valid);
 
     u8 *byte = mem.mem;
@@ -23,7 +23,7 @@ test_allocate_free(void)
     mag_sys_memory_free(&mem);
     Assert(!mem.valid);
 
-    mem = mag_sys_memory_allocate(MAG_MiB(1));
+    mem = mag_sys_memory_allocate(ECO_MiB(1));
     Assert(mem.valid);
 
     byte = mem.mem;
@@ -33,7 +33,7 @@ test_allocate_free(void)
     mag_sys_memory_free(&mem);
     Assert(!mem.valid);
 
-    mem = mag_sys_memory_allocate(MAG_GiB(1));
+    mem = mag_sys_memory_allocate(ECO_GiB(1));
     Assert(mem.valid);
 
     byte = mem.mem;

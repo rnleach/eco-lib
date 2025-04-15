@@ -34,7 +34,7 @@ insert_buffer(size out_size, size *out_idx, char *out, size in_size, char *in)
 void
 build_elk()
 {
-    char main_buffer[COY_KiB(340)] = {0};
+    char main_buffer[ECO_KiB(340)] = {0};
     size mb_size = 0;
 
     // Load all the files
@@ -58,15 +58,15 @@ build_magpie()
 {
     // Output buffer
     size oi = 0; //output index
-    char finished_lib[COY_KiB(350)] = {0};
+    char finished_lib[ECO_KiB(350)] = {0};
 
-    char main_buffer[COY_KiB(100)] = {0};
+    char main_buffer[ECO_KiB(100)] = {0};
     size mb_size = 0;
-    char win32_buffer[COY_KiB(100)] = {0};
+    char win32_buffer[ECO_KiB(100)] = {0};
     size w32_size = 0;
-    char apple_buffer[COY_KiB(20)] = {0};
+    char apple_buffer[ECO_KiB(20)] = {0};
     size ap_size = 0;
-    char linux_buffer[COY_KiB(20)] = {0};
+    char linux_buffer[ECO_KiB(20)] = {0};
     size li_size = 0;
 
     // Load all the files
@@ -142,17 +142,17 @@ build_coyote()
 {
     // Output buffer
     size oi = 0; //output index
-    char finished_lib[COY_KiB(350)] = {0};
+    char finished_lib[ECO_KiB(350)] = {0};
 
-    char main_buffer[COY_KiB(100)] = {0};
+    char main_buffer[ECO_KiB(100)] = {0};
     size mb_size = 0;
-    char win32_buffer[COY_KiB(100)] = {0};
+    char win32_buffer[ECO_KiB(100)] = {0};
     size w32_size = 0;
-    char common_buffer[COY_KiB(100)] = {0};
+    char common_buffer[ECO_KiB(100)] = {0};
     size common_size = 0;
-    char apple_buffer[COY_KiB(20)] = {0};
+    char apple_buffer[ECO_KiB(20)] = {0};
     size ap_size = 0;
-    char linux_buffer[COY_KiB(20)] = {0};
+    char linux_buffer[ECO_KiB(20)] = {0};
     size li_size = 0;
 
     // Load all the files
@@ -237,7 +237,7 @@ build_coyote()
 void
 build_packrat()
 {
-    char main_buffer[COY_KiB(340)] = {0};
+    char main_buffer[ECO_KiB(340)] = {0};
     size mb_size = 0;
 
     // Load all the files

@@ -34,16 +34,6 @@ typedef struct
     b32 valid;
 } MagMemoryBlock;
 
-#define MAG_KB(a) ((a) * INT64_C(1000))
-#define MAG_MB(a) (MAG_KB(a) * INT64_C(1000))
-#define MAG_GB(a) (MAG_MB(a) * INT64_C(1000))
-#define MAG_TB(a) (MAG_GB(a) * INT64_C(1000))
-
-#define MAG_KiB(a) ((a) * (1024))
-#define MAG_MiB(a) (MAG_KiB(a) * INT64_C(1024))
-#define MAG_GiB(a) (MAG_MiB(a) * INT64_C(1024))
-#define MAG_TiB(a) (MAG_GiB(a) * INT64_C(1024))
-
 static inline MagMemoryBlock mag_sys_memory_allocate(size minimum_num_bytes);
 static inline void mag_sys_memory_free(MagMemoryBlock *mem);
 
