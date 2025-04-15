@@ -14,14 +14,6 @@
 
 
 /*---------------------------------------------------------------------------------------------------------------------------
- * Declare parts of the standard C library I use. These should almost always be implemented as compiler intrinsics anyway.
- *-------------------------------------------------------------------------------------------------------------------------*/
-
-void *memset(void *buffer, int val, size_t num_bytes);
-void *memcpy(void *dest, void const *src, size_t num_bytes);
-void *memmove(void *dest, void const *src, size_t num_bytes);
-
-/*---------------------------------------------------------------------------------------------------------------------------
  *                                                 Static Arena Allocator
  *---------------------------------------------------------------------------------------------------------------------------
  *
