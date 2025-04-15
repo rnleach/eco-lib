@@ -39,6 +39,11 @@ test_empty_full_array(void)
         Assert(!elk_array_ledger_empty(ap)); // Should never be empty after we've pushed.
     }
 
+    for (i32 i = 0; i < TEST_BUF_ARRAY_LEDGER_CNT; ++i) 
+    {
+        Assert(ibuf[i] == i);
+    }
+
     Assert(elk_array_ledger_full(ap));
     Assert(elk_array_ledger_len(ap) == TEST_BUF_ARRAY_LEDGER_CNT);
 
