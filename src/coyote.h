@@ -86,12 +86,12 @@ static inline b32 coy_file_read_str(CoyFileReader *file, size *len, char *str); 
 static inline void coy_file_reader_close(CoyFileReader *file);                      /* Must set valid member to false on success or failure!       */
 
 /* Convenient loading of files. */
-static inline size coy_file_slurp(char const *filename, byte **out, ElkStaticArena *arena);   
-static inline ElkStr coy_file_slurp_text_static(char const *filename, ElkStaticArena *arena);
+static inline size coy_file_slurp(char const *filename, byte **out, MagStaticArena *arena);   
+static inline ElkStr coy_file_slurp_text_static(char const *filename, MagStaticArena *arena);
 static inline ElkStr coy_file_slurp_text_dyn(char const *filename, MagDynArena *arena);
 
 #define eco_file_slurp_text(fname, arena) _Generic((arena),                                                                 \
-                                         ElkStaticArena *: coy_file_slurp_text_static,                                      \
+                                         MagStaticArena *: coy_file_slurp_text_static,                                      \
                                          ElkDynArena *:    coy_file_slurp_text_dyn                                          \
                                          )(fname, arena)
 
@@ -984,12 +984,12 @@ coy_profile_end_block(CoyProfileAnchor *anchor)
 static inline size coy_file_slurp_internal(char const *filename, size buf_size, byte *buffer);
 
 static inline size 
-coy_file_slurp(char const *filename, byte **out, ElkStaticArena *arena)
+coy_file_slurp(char const *filename, byte **out, MagStaticArena *arena)
 {
     size fsize = coy_file_size(filename);
     StopIf(fsize < 0, goto ERR_RETURN);
 
-    *out = elk_static_arena_nmalloc(arena, fsize, byte);
+    *out = mag_static_arena_nmalloc(arena, fsize, byte);
     StopIf(!*out, goto ERR_RETURN);
 
     size size_read = coy_file_slurp_internal(filename, fsize, *out);
@@ -1003,13 +1003,13 @@ ERR_RETURN:
 }
 
 static inline ElkStr 
-coy_file_slurp_text_static(char const *filename, ElkStaticArena *arena)
+coy_file_slurp_text_static(char const *filename, MagStaticArena *arena)
 {
 
     size fsize = coy_file_size(filename);
     StopIf(fsize < 0, goto ERR_RETURN);
 
-    byte *out = elk_static_arena_nmalloc(arena, fsize, byte);
+    byte *out = mag_static_arena_nmalloc(arena, fsize, byte);
     StopIf(!out, goto ERR_RETURN);
 
     size size_read = coy_file_slurp_internal(filename, fsize, out);

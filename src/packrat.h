@@ -23,15 +23,15 @@ typedef struct // Internal only
 
 typedef struct 
 {
-    ElkStaticArena *storage;          // This is where to store the strings
+    MagStaticArena *storage;          /* This is where to store the strings.           */
 
-    PakStringInternerHandle *handles; // The hash table - handles index into storage
-    u32 num_handles;                  // The number of handles
-    i8 size_exp;                      // Used to keep track of the length of *handles
+    PakStringInternerHandle *handles; /* The hash table - handles index into storage.  */
+    u32 num_handles;                  /* The number of handles.                        */
+    i8 size_exp;                      /* Used to keep track of the length of *handles. */
 } PakStringInterner;
 
 
-static inline PakStringInterner pak_string_interner_create(i8 size_exp, ElkStaticArena *storage);
+static inline PakStringInterner pak_string_interner_create(i8 size_exp, MagStaticArena *storage);
 static inline void pak_string_interner_destroy(PakStringInterner *interner);
 static inline ElkStr pak_string_interner_intern_cstring(PakStringInterner *interner, char *string);
 static inline ElkStr pak_string_interner_intern(PakStringInterner *interner, ElkStr str);
@@ -51,8 +51,7 @@ static inline ElkStr pak_string_interner_intern(PakStringInterner *interner, Elk
  *---------------------------------------------------------------------------------------------------------------------------
  *
  *  Ordered collections are things like arrays (sometimes called vectors), queues, dequeues, and heaps. I'm taking a 
- *  different approach to how I implement them. They will be implemented in two parts, the second of which might not be
- *  necessary. 
+ *  different approach to how I implement them. They will be implemented in two parts.
  *
  *  The first part is the ledger, which just does all the bookkeeping about how full the collection is, which elements are
  *  valid, and the order of elements. A user can use these with their own supplied buffer for storing objects. The ledger
@@ -83,9 +82,6 @@ static inline ElkStr pak_string_interner_intern(PakStringInterner *interner, Elk
  *
  *  Adjacent just means that the objects are stored adjacently in memory. All of the collection ledger types must be backed
  *  by an array or a block of contiguous memory.
- *
- *  NOTE: The resizable collections may not be implemented unless I need them. I've found that I need dynamically expandable
- *  collections much less frequently.
  */
 
 static size const PAK_COLLECTION_EMPTY = ELK_COLLECTION_EMPTY;
@@ -115,7 +111,7 @@ typedef struct // Internal Only
 
 typedef struct 
 {
-    ElkStaticArena *arena;
+    MagStaticArena *arena;
     PakHashMapHandle *handles;
     size num_handles;
     ElkSimpleHash hasher;
@@ -125,7 +121,7 @@ typedef struct
 
 typedef size PakHashMapKeyIter;
 
-static inline PakHashMap pak_hash_map_create(i8 size_exp, ElkSimpleHash key_hash, ElkEqFunction key_eq, ElkStaticArena *arena);
+static inline PakHashMap pak_hash_map_create(i8 size_exp, ElkSimpleHash key_hash, ElkEqFunction key_eq, MagStaticArena *arena);
 static inline void pak_hash_map_destroy(PakHashMap *map);
 static inline void *pak_hash_map_insert(PakHashMap *map, void *key, void *value); // if return != value, key was already in the map
 static inline void *pak_hash_map_lookup(PakHashMap *map, void *key); // return NULL if not in map, otherwise return pointer to value
@@ -152,7 +148,7 @@ typedef struct
 
 typedef struct 
 {
-    ElkStaticArena *arena;
+    MagStaticArena *arena;
     PakStrMapHandle *handles;
     size num_handles;
     i8 size_exp;
@@ -161,7 +157,7 @@ typedef struct
 typedef size PakStrMapKeyIter;
 typedef size PakStrMapHandleIter;
 
-static inline PakStrMap pak_str_map_create(i8 size_exp, ElkStaticArena *arena);
+static inline PakStrMap pak_str_map_create(i8 size_exp, MagStaticArena *arena);
 static inline void pak_str_map_destroy(PakStrMap *map);
 static inline void *pak_str_map_insert(PakStrMap *map, ElkStr key, void *value); // if return != value, key was already in the map
 static inline void *pak_str_map_lookup(PakStrMap *map, ElkStr key); // return NULL if not in map, otherwise return pointer to value
@@ -190,7 +186,7 @@ typedef struct // Internal only
 
 typedef struct 
 {
-    ElkStaticArena *arena;
+    MagStaticArena *arena;
     PakHashSetHandle *handles;
     size num_handles;
     ElkSimpleHash hasher;
@@ -200,7 +196,7 @@ typedef struct
 
 typedef size PakHashSetIter;
 
-static inline PakHashSet pak_hash_set_create(i8 size_exp, ElkSimpleHash val_hash, ElkEqFunction val_eq, ElkStaticArena *arena);
+static inline PakHashSet pak_hash_set_create(i8 size_exp, ElkSimpleHash val_hash, ElkEqFunction val_eq, MagStaticArena *arena);
 static inline void pak_hash_set_destroy(PakHashSet *set);
 static inline void *pak_hash_set_insert(PakHashSet *set, void *value); // if return != value, value was already in the set
 static inline void *pak_hash_set_lookup(PakHashSet *set, void *value); // return NULL if not in set, else return ptr to value
@@ -236,7 +232,7 @@ static inline void *pak_hash_set_value_iter_next(PakHashSet *set, PakHashSetIter
  *
  * The sort requires extra memory that depends on the size of the list being sorted, so the user must provide that. In order
  * to ensure proper alignment and size, the user must provide the scratch buffer. Probably using an arena with 
- * elk_static_arena_nmalloc() to create a buffer and then freeing it after the sort would be the most efficient way to handle
+ * mag_static_arena_nmalloc() to create a buffer and then freeing it after the sort would be the most efficient way to handle
  * that.
  *
  * The API is set up for sorting an array of structures. The 'offset' argument is the offset in bytes into the structure 
@@ -280,12 +276,12 @@ static inline void pak_radix_sort(
  *
  *-------------------------------------------------------------------------------------------------------------------------*/
 static inline PakStringInterner 
-pak_string_interner_create(i8 size_exp, ElkStaticArena *storage)
+pak_string_interner_create(i8 size_exp, MagStaticArena *storage)
 {
     Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
 
     usize const handles_len = (usize)(1 << size_exp);
-    PakStringInternerHandle *handles = elk_static_arena_nmalloc(storage, handles_len, PakStringInternerHandle);
+    PakStringInternerHandle *handles = mag_static_arena_nmalloc(storage, handles_len, PakStringInternerHandle);
     PanicIf(!handles);
 
     return (PakStringInterner)
@@ -329,7 +325,7 @@ pak_string_interner_expand_table(PakStringInterner *interner)
     usize const handles_len = (usize)(1 << size_exp);
     usize const new_handles_len = (usize)(1 << new_size_exp);
 
-    PakStringInternerHandle *new_handles = elk_static_arena_nmalloc(interner->storage, new_handles_len, PakStringInternerHandle);
+    PakStringInternerHandle *new_handles = mag_static_arena_nmalloc(interner->storage, new_handles_len, PakStringInternerHandle);
     PanicIf(!new_handles);
 
     for (u32 i = 0; i < handles_len; i++) 
@@ -388,7 +384,7 @@ pak_string_interner_intern(PakStringInterner *interner, ElkStr str)
             // empty, insert here if room in the table of handles. Check for room first!
             if (pak_hash_table_large_enough(interner->num_handles, interner->size_exp))
             {
-                char *dest = elk_static_arena_nmalloc(interner->storage, str.len + 1, char);
+                char *dest = mag_static_arena_nmalloc(interner->storage, str.len + 1, char);
                 PanicIf(!dest);
                 ElkStr interned_str = elk_str_copy(str.len + 1, dest, str);
 
@@ -416,12 +412,12 @@ pak_string_interner_intern(PakStringInterner *interner, ElkStr str)
 }
 
 static PakHashMap 
-pak_hash_map_create(i8 size_exp, ElkSimpleHash key_hash, ElkEqFunction key_eq, ElkStaticArena *arena)
+pak_hash_map_create(i8 size_exp, ElkSimpleHash key_hash, ElkEqFunction key_eq, MagStaticArena *arena)
 {
     Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
 
     size const handles_len = (size)(1 << size_exp);
-    PakHashMapHandle *handles = elk_static_arena_nmalloc(arena, handles_len, PakHashMapHandle);
+    PakHashMapHandle *handles = mag_static_arena_nmalloc(arena, handles_len, PakHashMapHandle);
     PanicIf(!handles);
 
     return (PakHashMap)
@@ -450,7 +446,7 @@ pak_hash_table_expand(PakHashMap *map)
     size const handles_len = (size)(1 << size_exp);
     size const new_handles_len = (size)(1 << new_size_exp);
 
-    PakHashMapHandle *new_handles = elk_static_arena_nmalloc(map->arena, new_handles_len, PakHashMapHandle);
+    PakHashMapHandle *new_handles = mag_static_arena_nmalloc(map->arena, new_handles_len, PakHashMapHandle);
     PanicIf(!new_handles);
 
     for (u32 i = 0; i < handles_len; i++) 
@@ -586,12 +582,12 @@ pak_hash_map_key_iter_next(PakHashMap *map, PakHashMapKeyIter *iter)
 }
 
 static inline PakStrMap 
-pak_str_map_create(i8 size_exp, ElkStaticArena *arena)
+pak_str_map_create(i8 size_exp, MagStaticArena *arena)
 {
     Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
 
     size const handles_len = (size)(1 << size_exp);
-    PakStrMapHandle *handles = elk_static_arena_nmalloc(arena, handles_len, PakStrMapHandle);
+    PakStrMapHandle *handles = mag_static_arena_nmalloc(arena, handles_len, PakStrMapHandle);
     PanicIf(!handles);
 
     return (PakStrMap)
@@ -618,7 +614,7 @@ pak_str_table_expand(PakStrMap *map)
     size const handles_len = (size)(1 << size_exp);
     size const new_handles_len = (size)(1 << new_size_exp);
 
-    PakStrMapHandle *new_handles = elk_static_arena_nmalloc(map->arena, new_handles_len, PakStrMapHandle);
+    PakStrMapHandle *new_handles = mag_static_arena_nmalloc(map->arena, new_handles_len, PakStrMapHandle);
     PanicIf(!new_handles);
 
     for (u32 i = 0; i < handles_len; i++) 
@@ -809,12 +805,12 @@ pak_str_map_handle_iter_next(PakStrMap *map, PakStrMapHandleIter *iter)
 }
 
 static inline PakHashSet 
-pak_hash_set_create(i8 size_exp, ElkSimpleHash val_hash, ElkEqFunction val_eq, ElkStaticArena *arena)
+pak_hash_set_create(i8 size_exp, ElkSimpleHash val_hash, ElkEqFunction val_eq, MagStaticArena *arena)
 {
     Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
 
     size const handles_len = (size)(1 << size_exp);
-    PakHashSetHandle *handles = elk_static_arena_nmalloc(arena, handles_len, PakHashSetHandle);
+    PakHashSetHandle *handles = mag_static_arena_nmalloc(arena, handles_len, PakHashSetHandle);
     PanicIf(!handles);
 
     return (PakHashSet)
@@ -843,7 +839,7 @@ pak_hash_set_expand(PakHashSet *set)
     size const handles_len = (size)(1 << size_exp);
     size const new_handles_len = (size)(1 << new_size_exp);
 
-    PakHashSetHandle *new_handles = elk_static_arena_nmalloc(set->arena, new_handles_len, PakHashSetHandle);
+    PakHashSetHandle *new_handles = mag_static_arena_nmalloc(set->arena, new_handles_len, PakHashSetHandle);
     PanicIf(!new_handles);
 
     for (u32 i = 0; i < handles_len; i++) 

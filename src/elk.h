@@ -67,6 +67,22 @@ typedef int64_t     i64;
 #endif
 
 /*---------------------------------------------------------------------------------------------------------------------------
+ *
+ *                                                      Memory Sizes
+ *
+ *-------------------------------------------------------------------------------------------------------------------------*/
+
+#define ECO_KiB(a) ((a) * INT64_C(1024))
+#define ECO_MiB(a) (ECO_KiB(a) * INT64_C(1024))
+#define ECO_GiB(a) (ECO_MiB(a) * INT64_C(1024))
+#define ECO_TiB(a) (ECO_GiB(a) * INT64_C(1024))
+
+#define ECO_KB(a) ((a) * INT64_C(1000))
+#define ECO_MB(a) (ECO_KB(a) * INT64_C(1000))
+#define ECO_GB(a) (ECO_MB(a) * INT64_C(1000))
+#define ECO_TB(a) (ECO_GB(a) * INT64_C(1000))
+
+/*---------------------------------------------------------------------------------------------------------------------------
  *                                                 Mathematical Constants
  *-------------------------------------------------------------------------------------------------------------------------*/
 #ifndef M_PI /* Assume if they have PI, they have them all.*/
@@ -212,110 +228,6 @@ typedef i32 ElkDateDiff;
 static inline ElkDateDiff elk_date_difference(ElkDate a, ElkDate b); /* a - b */
 static inline ElkDate elk_date_from_ymd(int year, int month, int day);
 /*---------------------------------------------------------------------------------------------------------------------------
- *
- *                                                      Memory Sizes
- *
- *-------------------------------------------------------------------------------------------------------------------------*/
-
-#define ECO_KiB(a) ((a) * INT64_C(1024))
-#define ECO_MiB(a) (ECO_KiB(a) * INT64_C(1024))
-#define ECO_GiB(a) (ECO_MiB(a) * INT64_C(1024))
-#define ECO_TiB(a) (ECO_GiB(a) * INT64_C(1024))
-
-#define ECO_KB(a) ((a) * INT64_C(1000))
-#define ECO_MB(a) (ECO_KB(a) * INT64_C(1000))
-#define ECO_GB(a) (ECO_MB(a) * INT64_C(1000))
-#define ECO_TB(a) (ECO_GB(a) * INT64_C(1000))
-
-/*---------------------------------------------------------------------------------------------------------------------------
- *                                                 Static Arena Allocator
- *---------------------------------------------------------------------------------------------------------------------------
- *
- * Compile with -D_ELK_TRACK_MEM_USAGE to include the maximum memory tracking variables & features.
- *
- * A statically sized, non-growable arena allocator that works on top of a user supplied buffer.
- */
-
-#ifdef _ELK_TRACK_MEM_USAGE
-typedef struct
-{
-    size max_offset;
-    b32 over_allocation_attempted;
-} ElkStaticArenaAllocationMetrics;
-#endif
-
-typedef struct 
-{
-    size buf_size;
-    size buf_offset;
-    byte *buffer;
-    void *prev_ptr;
-    size prev_offset;
-#ifdef _ELK_TRACK_MEM_USAGE
-    ElkStaticArenaAllocationMetrics *metrics_ptr;
-#endif
-} ElkStaticArena;
-
-static inline void elk_static_arena_create(ElkStaticArena *arena, size buf_size, byte buffer[]);
-static inline void elk_static_arena_destroy(ElkStaticArena *arena);
-static inline void elk_static_arena_reset(ElkStaticArena *arena);                                  // Set offset to 0, invalidates all previous allocations
-static inline void *elk_static_arena_alloc(ElkStaticArena *arena, size num_bytes, size alignment); // ret NULL if OOM
-static inline void *elk_static_arena_realloc(ElkStaticArena *arena, void *ptr, size asize);        // ret NULL if ptr is not most recent allocation
-static inline void elk_static_arena_free(ElkStaticArena *arena, void *ptr);                        // Undo if it was last allocation, otherwise no-op
-
-#define elk_static_arena_malloc(arena, type) (type *)elk_static_arena_alloc((arena), sizeof(type), _Alignof(type))
-#define elk_static_arena_nmalloc(arena, count, type) (type *)elk_static_arena_alloc((arena), (count) * sizeof(type), _Alignof(type))
-#define elk_static_arena_nrealloc(arena, ptr, count, type) (type *) elk_static_arena_realloc((arena), (ptr), sizeof(type) * (count))
-
-#ifdef _ELK_TRACK_MEM_USAGE
-static ElkStaticArenaAllocationMetrics elk_static_arena_metrics[128] = {0};
-static size elk_static_arena_metrics_next = 0;
-static inline f64 elk_static_arena_max_ratio(ElkStaticArena *arena);
-static inline b32 elk_static_arena_over_allocated(ElkStaticArena *arena);
-#endif
-
-#define eco_arena_malloc(arena, type) (type *)elk_static_arena_alloc(arena, sizeof(type), _Alignof(type))
-#define eco_arena_nmalloc(arena, count, type) (type *)elk_static_arena_alloc(arena, (count) * sizeof(type), _Alignof(type))
-#define eco_arena_nrealloc(arena, ptr, count, type) elk_static_arena_realloc(arena, ptr, sizeof(type) * (count))
-#define eco_arena_destroy(arena) elk_static_arena_destroy(arena)
-#define eco_arena_free(arena, ptr) elk_static_arena_free(arena, ptr)
-#define eco_arena_reset(arena) elk_static_arena_reset(arena)
-
-/*---------------------------------------------------------------------------------------------------------------------------
- *                                                  Static Pool Allocator
- *---------------------------------------------------------------------------------------------------------------------------
- *
- * This is an error prone and brittle type. If you get it all working, a refactor or code edit later is likely to break it.
- *
- * WARNING: It is the user's responsibility to make sure that there is at least object_size * num_objects bytes in the
- * backing buffer. If that isn't true, you'll probably get a seg-fault during initialization.
- *
- * WARNING: Object_size must be a multiple of sizeof(void*) to ensure the buffer is aligned to hold pointers also. That also
- * means object_size must be at least sizeof(void*).
- *
- * WARNING: It is the user's responsibility to make sure the buffer is correctly aligned for the type of objects they will
- * be storing in it. This isn't a concern if the memory came from malloc() et al as they return memory with the most
- * pessimistic alignment. However, if using a stack allocated or static memory section, you should use an _Alignas to force
- * the alignment.
- */
-typedef struct 
-{
-    size object_size;    // The size of each object
-    size num_objects;    // The capacity, or number of objects storable in the pool
-    void *free;          // The head of a free list of available slots for objects
-    byte *buffer;        // The buffer we actually store the data in
-} ElkStaticPool;
-
-static inline void elk_static_pool_create(ElkStaticPool *pool, size object_size, size num_objects, byte buffer[]);
-static inline void elk_static_pool_destroy(ElkStaticPool *pool);
-static inline void elk_static_pool_reset(ElkStaticPool *pool);
-static inline void elk_static_pool_free(ElkStaticPool *pool, void *ptr);
-static inline void * elk_static_pool_alloc(ElkStaticPool *pool); // returns NULL if there's no more space available.
-// no elk_static_pool_realloc because that doesn't make sense!
-
-#define elk_static_pool_malloc(alloc, type) (type *)elk_static_pool_alloc(alloc)
-
-/*---------------------------------------------------------------------------------------------------------------------------
  *                                                      String Slice
  *---------------------------------------------------------------------------------------------------------------------------
  *
@@ -351,9 +263,6 @@ static inline i32 elk_str_cmp(ElkStr left, ElkStr right);                  /* 0 
 static inline b32 elk_str_eq(ElkStr const left, ElkStr const right);       /* Faster than elk_str_cmp, checks length first */
 static inline ElkStrSplitPair elk_str_split_on_char(ElkStr str, char const split_char);
 
-/* See macros below to automatically select functions for dynamic vs static arenas. */
-static inline ElkStr elk_str_alloc_copy_static(ElkStr src, ElkStaticArena *arena);          /* Allocate space and create a copy.                                                        */
-static inline ElkStr elk_str_append_static(ElkStr dest, ElkStr src, ElkStaticArena *arena); /* If dest wasn't the last thing allocated on arena, this fails and returns an empty string */
 
 /* Parsing values from strings.
  *
@@ -376,10 +285,6 @@ static inline b32 elk_str_parse_datetime(ElkStr str, ElkTime *out);
 static inline b32 elk_str_parse_usa_date(ElkStr str, ElkDate *out); /* MM-DD-YYYY format */
 
 #define elk_str_parse_elk_time(str, result) elk_str_parse_i64((str), (result))
-
-/* Convenience functions. These may may be extended with _Generic in Magpie. */
-#define eco_str_append(dest, src, arena) elk_str_append_static(dest, src, arena)
-#define eco_str_alloc_copy(dest, src, arena) elk_str_alloc_copy_static(dest, src, arena)
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                      Hashes
@@ -887,41 +792,6 @@ elk_str_copy(size dst_len, char *restrict dest, ElkStr src)
     if(copy_len < dst_len) { dest[copy_len] = '\0'; }
 
     return (ElkStr){.start = dest, .len = copy_len};
-}
-
-static inline ElkStr 
-elk_str_alloc_copy_static(ElkStr src, ElkStaticArena *arena)
-{
-    ElkStr ret_val = {0};
-
-    size copy_len = src.len + 1; // Add room for terminating zero.
-    char *buffer = elk_static_arena_nmalloc(arena, copy_len, char);
-    StopIf(!buffer, return ret_val); // Return NULL string if out of memory
-
-    ret_val = elk_str_copy(copy_len, buffer, src);
-
-    return ret_val;
-}
-
-static inline ElkStr 
-elk_str_append_static(ElkStr dest, ElkStr src, ElkStaticArena *arena)
-{
-    ElkStr result = {0};
-
-    if(src.len <= 0) { return result; }
-
-    size new_len = dest.len + src.len;
-    char *buf = dest.start;
-    buf = elk_static_arena_nrealloc(arena, buf, new_len, char);
-
-    if(!buf) { return result; }
-
-    result.start = buf;
-    result.len = new_len;
-    char *dest_ptr = dest.start + dest.len;
-    memcpy(dest_ptr, src.start, src.len);
-
-    return result;
 }
 
 static inline ElkStr
@@ -1507,242 +1377,6 @@ static inline u64
 elk_fnv1a_hash_str(ElkStr str)
 {
     return elk_fnv1a_hash(str.len, str.start);
-}
-
-static inline b32
-elk_is_power_of_2(uptr p)
-{
-    return (p & (p - 1)) == 0;
-}
-
-static inline uptr
-elk_align_pointer(uptr ptr, usize align)
-{
-
-    Assert(elk_is_power_of_2(align));
-
-    uptr a = (uptr)align;
-    uptr mod = ptr & (a - 1); // Same as (ptr % a) but faster as 'a' is a power of 2
-
-    if (mod != 0)
-    {
-        // push the address forward to the next value which is aligned
-        ptr += a - mod;
-    }
-
-    return ptr;
-}
-
-static inline void
-elk_static_arena_create(ElkStaticArena *arena, size buf_size, byte buffer[])
-{
-    Assert(arena && buffer && buf_size > 0);
-
-    *arena = (ElkStaticArena)
-    {
-        .buf_size = buf_size,
-        .buf_offset = 0,
-        .buffer = buffer,
-        .prev_ptr = NULL,
-        .prev_offset = 0,
-    };
-
-#ifdef _ELK_TRACK_MEM_USAGE
-    size idx = elk_static_arena_metrics_next++;
-    Assert(idx < (sizeof(elk_static_arena_metrics) / sizeof(elk_static_arena_metrics[0])));
-    arena->metrics_ptr = &elk_static_arena_metrics[idx];
-    *arena->metrics_ptr = (ElkStaticArenaAllocationMetrics){0};
-#endif
-    return;
-}
-
-static inline void
-elk_static_arena_destroy(ElkStaticArena *arena)
-{
-    // no-op
-    return;
-}
-
-static inline void
-elk_static_arena_reset(ElkStaticArena *arena)
-{
-    Assert(arena->buffer);
-    arena->buf_offset = 0;
-    arena->prev_ptr = NULL;
-    arena->prev_offset = 0;
-    return;
-}
-
-static inline void *
-elk_static_arena_alloc(ElkStaticArena *arena, size num_bytes, size alignment)
-{
-    Assert(num_bytes > 0 && alignment > 0);
-
-    // Align 'curr_offset' forward to the specified alignment
-    uptr curr_ptr = (uptr)arena->buffer + (uptr)arena->buf_offset;
-    uptr offset = elk_align_pointer(curr_ptr, alignment);
-    offset -= (uptr)arena->buffer; // change to relative offset
-
-    // Check to see if there is enough space left
-    if ((size)(offset + num_bytes) <= arena->buf_size)
-    {
-        void *ptr = &arena->buffer[offset];
-        memset(ptr, 0, num_bytes);
-        arena->prev_offset = arena->buf_offset;
-        arena->buf_offset = offset + num_bytes;
-        arena->prev_ptr = ptr;
-
-#ifdef _ELK_TRACK_MEM_USAGE
-        arena->metrics_ptr->max_offset = arena->buf_offset > (arena->metrics_ptr->max_offset) ?
-            arena->buf_offset : (arena->metrics_ptr->max_offset);
-#endif
-
-        return ptr;
-    }
-    else
-    {
-#ifdef _ELK_TRACK_MEM_USAGE
-        arena->metrics_ptr->over_allocation_attempted = true;
-#endif
-        return NULL;
-    }
-}
-
-static inline void * 
-elk_static_arena_realloc(ElkStaticArena *arena, void *ptr, size asize)
-{
-    Assert(asize > 0);
-
-    if(ptr == arena->prev_ptr)
-    {
-        // Get previous extra offset due to alignment
-        uptr offset = (uptr)ptr - (uptr)arena->buffer; // relative offset accounting for alignment
-
-        // Check to see if there is enough space left
-        if ((size)(offset + asize) <= arena->buf_size)
-        {
-            arena->buf_offset = offset + asize;
-
-#ifdef _ELK_TRACK_MEM_USAGE
-            arena->metrics_ptr->max_offset = arena->buf_offset > (arena->metrics_ptr->max_offset) ?
-                arena->buf_offset : (arena->metrics_ptr->max_offset);
-#endif
-
-            return ptr;
-        }
-        else
-        {
-#ifdef _ELK_TRACK_MEM_USAGE
-            arena->metrics_ptr->over_allocation_attempted = true;
-#endif
-        }
-    }
-
-    return NULL;
-}
-
-static inline void
-elk_static_arena_free(ElkStaticArena *arena, void *ptr)
-{
-    if(ptr == arena->prev_ptr)
-    {
-        arena->buf_offset = arena->prev_offset;
-    }
-
-    return;
-}
-
-#ifdef _ELK_TRACK_MEM_USAGE
-
-static inline f64 
-elk_static_arena_max_ratio(ElkStaticArena *arena)
-{
-    return (f64)arena->metrics_ptr->max_offset / (f64)arena->buf_size;
-}
-
-static inline b32 
-elk_static_arena_over_allocated(ElkStaticArena *arena)
-{
-    return arena->metrics_ptr->over_allocation_attempted;
-}
-
-#endif
-
-static inline void
-elk_static_pool_initialize_linked_list(byte *buffer, size object_size, size num_objects)
-{
-
-    // Initialize the free list to a linked list.
-
-    // start by pointing to last element and assigning it NULL
-    size offset = object_size * (num_objects - 1);
-    uptr *ptr = (uptr *)&buffer[offset];
-    *ptr = (uptr)NULL;
-
-    // Then work backwards to the front of the list.
-    while (offset) 
-    {
-        size next_offset = offset;
-        offset -= object_size;
-        ptr = (uptr *)&buffer[offset];
-        uptr next = (uptr)&buffer[next_offset];
-        *ptr = next;
-    }
-
-    return;
-}
-
-static inline void
-elk_static_pool_reset(ElkStaticPool *pool)
-{
-    Assert(pool && pool->buffer && pool->num_objects && pool->object_size);
-
-    // Initialize the free list to a linked list.
-    elk_static_pool_initialize_linked_list(pool->buffer, pool->object_size, pool->num_objects);
-    pool->free = &pool->buffer[0];
-}
-
-static inline void
-elk_static_pool_create(ElkStaticPool *pool, size object_size, size num_objects, byte buffer[])
-{
-    Assert(object_size >= sizeof(void *));       // Need to be able to fit at least a pointer!
-    Assert(object_size % _Alignof(void *) == 0); // Need for alignment of pointers.
-    Assert(num_objects > 0);
-
-    pool->buffer = buffer;
-    pool->object_size = object_size;
-    pool->num_objects = num_objects;
-
-    elk_static_pool_reset(pool);
-}
-
-static inline void
-elk_static_pool_destroy(ElkStaticPool *pool)
-{
-    memset(pool, 0, sizeof(*pool));
-}
-
-static inline void
-elk_static_pool_free(ElkStaticPool *pool, void *ptr)
-{
-    uptr *next = ptr;
-    *next = (uptr)pool->free;
-    pool->free = ptr;
-}
-
-static inline void *
-elk_static_pool_alloc(ElkStaticPool *pool)
-{
-    void *ptr = pool->free;
-    uptr *next = pool->free;
-
-    if (ptr) 
-    {
-        pool->free = (void *)*next;
-        memset(ptr, 0, pool->object_size);
-    }
-
-    return ptr;
 }
 
 static inline ElkQueueLedger

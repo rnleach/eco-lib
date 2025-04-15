@@ -21,8 +21,6 @@ main(int argc, char *argv[])
     elk_fnv1a_tests();
     elk_str_tests();
     elk_parse_tests();
-    elk_arena_tests();
-    elk_pool_tests();
     elk_queue_ledger_tests();
     elk_array_ledger_tests();
     elk_csv_tests();
@@ -33,6 +31,8 @@ main(int argc, char *argv[])
     fprintf(stderr, "magpie_sys_memory_tests()..");
     ap = COY_START_PROFILE_BLOCK("magpie sys_memory_tests");
     magpie_sys_memory_tests();
+    magpie_arena_tests();
+    magpie_pool_tests();
     COY_END_PROFILE(ap);
     fprintf(stderr, ".complete.\n");
 
@@ -107,18 +107,18 @@ main(int argc, char *argv[])
 }
 
 
-#include "elk/arena.c"
 #include "elk/array_ledger.c"
 #include "elk/csv.c"
 #include "elk/fnv1a.c"
 #include "elk/parse.c"
-#include "elk/pool.c"
 #include "elk/queue_ledger.c"
 #include "elk/str.c"
 #include "elk/time.c"
 #include "elk/date.c"
 
 #include "magpie/sys_memory.c"
+#include "magpie/arena.c"
+#include "magpie/pool.c"
 
 #include "coyote/fileio.c"
 #include "coyote/file_name_iterator.c"

@@ -9,7 +9,7 @@
 #    undef NDEBUG
 #endif
 
-#define _ELK_TRACK_MEM_USAGE
+#define _MAG_TRACK_MEM_USAGE
 
 #include <stdio.h>
 #include "../build/elk.h"
@@ -22,13 +22,13 @@ void elk_date_tests(void);
 void elk_fnv1a_tests(void);
 void elk_str_tests(void);
 void elk_parse_tests(void);
-void elk_arena_tests(void);
-void elk_pool_tests(void);
 void elk_queue_ledger_tests(void);
 void elk_array_ledger_tests(void);
 void elk_csv_tests(void);
 
 void magpie_sys_memory_tests(void);
+void magpie_arena_tests(void);
+void magpie_pool_tests(void);
 
 void coyote_time_tests(void);
 void coyote_file_tests(void);
