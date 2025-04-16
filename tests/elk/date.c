@@ -39,6 +39,15 @@ test_date_parsing()
     }
 }
 
+static void
+test_date_and_unixtime(void)
+{
+    i64 unix_time = 0;
+    ElkDate converted_date = elk_date_from_unix_timestamp(unix_time);
+    ElkDate date = elk_date_from_ymd(1970, 1, 1);
+    Assert(date == converted_date);
+}
+
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                     All date tests
  *-------------------------------------------------------------------------------------------------------------------------*/
@@ -47,5 +56,6 @@ elk_date_tests(void)
 {
     test_date_addition();
     test_date_parsing();
+    test_date_and_unixtime();
 }
 

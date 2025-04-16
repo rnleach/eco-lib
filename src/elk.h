@@ -227,6 +227,8 @@ typedef i32 ElkDateDiff;
 
 static inline ElkDateDiff elk_date_difference(ElkDate a, ElkDate b); /* a - b */
 static inline ElkDate elk_date_from_ymd(int year, int month, int day);
+static inline i64 elk_date_to_unix_epoch(ElkDate date);
+static inline ElkDate elk_date_from_unix_timestamp(i64 unixtime);
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                      String Slice
  *---------------------------------------------------------------------------------------------------------------------------
@@ -684,6 +686,18 @@ elk_date_from_ymd(int year, int month, int day)
     Assert(dt >= 0);
 
     return dt;
+}
+
+static inline i64 
+elk_date_to_unix_epoch(ElkDate date)
+{
+    return date * SECONDS_PER_DAY - elk_unix_epoch_timestamp;
+}
+
+static inline ElkDate 
+elk_date_from_unix_timestamp(i64 unixtime)
+{
+    return (unixtime + elk_unix_epoch_timestamp) / SECONDS_PER_DAY;
 }
 
 static inline ElkStr
