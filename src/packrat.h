@@ -132,15 +132,6 @@ static inline void pak_array_ledger_reset(PakArrayLedger *array);
 static inline void pak_array_ledger_set_capacity(PakArrayLedger *array, size capacity);
 
 /*---------------------------------------------------------------------------------------------------------------------------
- *                                            Generic Macros for Collections
- *---------------------------------------------------------------------------------------------------------------------------
- * These macros take any collection and return a result.
- */
-#define pak_len(x) _Generic((x),                                                                                            \
-        PakQueueLedger *: pak_queue_ledger_len,                                                                             \
-        PakArrayLedger *: pak_array_ledger_len,                                                                             
-
-/*---------------------------------------------------------------------------------------------------------------------------
  *                                         
  *                                                  Unordered Collections
  *
