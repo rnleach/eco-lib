@@ -1340,7 +1340,7 @@ elk_csv_create_parser(ElkStr input)
 static inline b32 
 elk_csv_finished(ElkCsvParser *parser)
 {
-    return parser->error || parser->remaining.len == 0;
+    return parser->error || parser->remaining.len <= 0;
 }
 
 static inline ElkCsvToken 
