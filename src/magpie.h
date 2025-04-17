@@ -145,6 +145,7 @@ typedef struct
 static inline void mag_dyn_arena_create(MagDynArena *arena, size default_block_size);
 static inline void mag_dyn_arena_destroy(MagDynArena *arena);
 static inline void mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce); /* Coalesce, keep the same size but in single block, else frees all excess blocks. */
+static inline void mag_dyn_arena_reset_default(MagDynArena *arena);
 static inline void *mag_dyn_arena_alloc(MagDynArena *arena, size num_bytes, size alignment);
 static inline void *mag_dyn_arena_realloc(MagDynArena *arena, void *ptr, size num_bytes);
 static inline void mag_dyn_arena_free(MagDynArena *arena, void *ptr);
@@ -152,8 +153,6 @@ static inline void mag_dyn_arena_free(MagDynArena *arena, void *ptr);
 #define mag_dyn_arena_malloc(arena, type) (type *)mag_dyn_arena_alloc((arena), sizeof(type), _Alignof(type))
 #define mag_dyn_arena_nmalloc(arena, count, type) (type *)mag_dyn_arena_alloc((arena), (count) * sizeof(type), _Alignof(type))
 #define mag_dyn_arena_nrealloc(arena, ptr, count, type) (type *) mag_dyn_arena_realloc((arena), (ptr), sizeof(type) * (count))
-
-#define mag_dyn_arena_reset_default(arena) mag_dyn_arena_reset(arena, true)
 
 #define eco_arena_malloc(arena, type) (type *) _Generic((arena),                                                            \
                                                MagStaticArena *: mag_static_arena_alloc,                                    \
@@ -627,6 +626,12 @@ mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
     }
 
     return;
+}
+
+static inline void 
+mag_dyn_arena_reset_default(MagDynArena *arena)
+{
+    mag_dyn_arena_reset(arena, true);
 }
 
 static inline MagDynArenaBlock *
