@@ -92,7 +92,7 @@ static inline ElkStr coy_file_slurp_text_dyn(char const *filename, MagDynArena *
 
 #define eco_file_slurp_text(fname, arena) _Generic((arena),                                                                 \
                                          MagStaticArena *: coy_file_slurp_text_static,                                      \
-                                         ElkDynArena *:    coy_file_slurp_text_dyn                                          \
+                                         MagDynArena *:    coy_file_slurp_text_dyn                                          \
                                          )(fname, arena)
 
 
