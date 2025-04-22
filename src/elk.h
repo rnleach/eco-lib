@@ -220,15 +220,24 @@ static inline ElkTime elk_time_from_yd_and_hms(int year, int day_of_year, int ho
 static inline ElkStructTime elk_make_struct_time(ElkTime time);
 
 /* If ElkTime has both date and time, why bother with a separate type for JUST dates? Because I can make it smaller in size
- * so it takes up less space.
+ * so it takes up less space. The valid dates range from 0001-01-01 to 32767-12-31 (YYYY-MM-DD).
  */
 typedef i32 ElkDate;
 typedef i32 ElkDateDiff;
 
-static inline ElkDateDiff elk_date_difference(ElkDate a, ElkDate b); /* a - b */
+typedef struct
+{
+    i16 year;
+    i8 month;
+    i8 day;
+} ElkStructDate;
+
 static inline ElkDate elk_date_from_ymd(int year, int month, int day);
-static inline i64 elk_date_to_unix_epoch(ElkDate date);
 static inline ElkDate elk_date_from_unix_timestamp(i64 unixtime);
+static inline ElkDate elk_date_from_struct_date(ElkStructDate sdate);
+static inline i64 elk_date_to_unix_epoch(ElkDate date);
+static inline ElkStructDate elk_make_struct_date(ElkDate date);
+static inline ElkDateDiff elk_date_difference(ElkDate a, ElkDate b); /* a - b, the difference in days. */
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                      String Slice
  *---------------------------------------------------------------------------------------------------------------------------
@@ -658,6 +667,51 @@ elk_make_struct_time(ElkTime time)
     };
 }
 
+static inline ElkStructDate 
+elk_make_struct_date(ElkDate date)
+{
+    Assert(date >= 0);
+
+    i64 const days_since_epoch = date;
+
+    // Calculate the year
+    int year = (int)(days_since_epoch / (DAYS_PER_YEAR) + 1); // High estimate, but good starting point.
+    i64 test_time = elk_days_since_epoch(year);
+    while (test_time > days_since_epoch) 
+    {
+        int step = (int)((test_time - days_since_epoch) / (DAYS_PER_YEAR + 1));
+        step = step == 0 ? 1 : step;
+        year -= step;
+        test_time = elk_days_since_epoch(year);
+    }
+    Assert(test_time <= elk_days_since_epoch(year));
+    date -= elk_days_since_epoch(year); // Now it's days since start of the year.
+    Assert(date >= 0);
+    Assert(year >= 1 && year <= INT16_MAX);
+
+    // Calculate the month
+    int month = 0;
+    int leap_year_idx = elk_is_leap_year(year) ? 1 : 0;
+    for (month = 1; month <= 11; month++)
+    {
+        if (sum_days_to_month[leap_year_idx][month + 1] > date) { break; }
+    }
+    Assert(date >= 0 && month >= 1 && month <= 12);
+    date -= sum_days_to_month[leap_year_idx][month]; // Now in days since start of month
+
+    // Calculate the day
+    int const day = (int const)(date + 1);
+    Assert(day >= 1 && day <= 31);
+
+    return (ElkStructDate) { .year = year, .month = month, .day = day, };
+}
+
+static inline ElkDate
+elk_date_from_struct_date(ElkStructDate sdate)
+{
+    return elk_date_from_ymd(sdate.year, sdate.month, sdate.day);
+}
+
 static inline ElkDateDiff 
 elk_date_difference(ElkDate a, ElkDate b)
 {
@@ -683,7 +737,7 @@ elk_date_from_ymd(int year, int month, int day)
     // Days in the days of the month up to this one.
     dt += (day - 1);
 
-    Assert(dt >= 0);
+    Assert(dt >= 0 && dt <= 11967899);
 
     return dt;
 }

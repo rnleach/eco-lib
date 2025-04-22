@@ -48,6 +48,33 @@ test_date_and_unixtime(void)
     Assert(date == converted_date);
 }
 
+static void
+test_struct_form_and_back(void)
+{
+    ElkDate d0 = 0;
+    ElkDate dinf1 = 11967899; /* This is the maximum year allowed. */
+    ElkStructDate sdinf2 = { .year = INT16_MAX, .month = 12, .day = 31 };
+
+    ElkStructDate sd0 = elk_make_struct_date(d0);
+    ElkStructDate sdinf1 = elk_make_struct_date(dinf1);
+    ElkDate dinf2 = elk_date_from_struct_date(sdinf2);
+
+    Assert(d0 == elk_date_from_struct_date(sd0));
+    Assert(dinf1 == elk_date_from_struct_date(sdinf1));
+    Assert(dinf2 == elk_date_from_struct_date(sdinf2));
+
+    ElkDate start = elk_date_from_ymd(1970, 1, 2);
+    ElkDate finish = elk_date_from_ymd(3000, 1, 1);
+    ElkDate curr = start;
+
+    do
+    {
+        ElkStructDate sd = elk_make_struct_date(curr);
+        Assert(curr == elk_date_from_struct_date(sd));
+        curr += 10;
+    } while(curr <= finish);
+}
+
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                     All date tests
  *-------------------------------------------------------------------------------------------------------------------------*/
@@ -57,5 +84,6 @@ elk_date_tests(void)
     test_date_addition();
     test_date_parsing();
     test_date_and_unixtime();
+    test_struct_form_and_back();
 }
 
