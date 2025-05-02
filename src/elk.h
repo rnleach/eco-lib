@@ -294,6 +294,8 @@ static inline b32 elk_str_robust_parse_f64(ElkStr str, f64 *out);
 static inline b32 elk_str_fast_parse_f64(ElkStr str, f64 *out);
 static inline b32 elk_str_parse_datetime(ElkStr str, ElkTime *out);
 static inline b32 elk_str_parse_usa_date(ElkStr str, ElkDate *out); /* MM-DD-YYYY format */
+static inline b32 elk_str_parse_ymd_date(ElkStr str, ElkDate *out); /* YYYY-MM-DD format */
+static inline b32 elk_str_parse_date(ElkStr str, ElkDate *out);     /* detect format */
 
 #define elk_str_parse_elk_time(str, result) elk_str_parse_i64((str), (result))
 
@@ -1324,6 +1326,41 @@ elk_str_parse_usa_date(ElkStr str, ElkDate *out)
     {
         *out = elk_date_from_ymd((i16)year, (i8)month, (i8)day);
         return true;
+    }
+
+    return false;
+}
+
+static inline b32 
+elk_str_parse_ymd_date(ElkStr str, ElkDate *out)
+{
+    /* YYYY-MM-DD format */
+    i64 year = INT64_MIN;
+    i64 month = INT64_MIN;
+    i64 day = INT64_MIN;
+
+    if(
+        elk_str_parse_i64(elk_str_substr(str,  0, 4), &year    ) && 
+        elk_str_parse_i64(elk_str_substr(str,  5, 2), &month   ) &&
+        elk_str_parse_i64(elk_str_substr(str,  8, 2), &day     ))
+    {
+        *out = elk_date_from_ymd((i16)year, (i8)month, (i8)day);
+        return true;
+    }
+
+    return false;
+}
+
+static inline b32 
+elk_str_parse_date(ElkStr str, ElkDate *out)
+{
+    if(str.start[2] == '-' || str.start[2] == '/')
+    {
+        return elk_str_parse_usa_date(str, out);
+    }
+    else if(str.start[4] == '-' || str.start[4] == '/')
+    {
+        return elk_str_parse_ymd_date(str, out);
     }
 
     return false;
