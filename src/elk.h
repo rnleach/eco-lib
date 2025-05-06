@@ -687,7 +687,7 @@ elk_make_struct_date(ElkDate date)
         test_time = elk_days_since_epoch(year);
     }
     Assert(test_time <= elk_days_since_epoch(year));
-    date -= elk_days_since_epoch(year); // Now it's days since start of the year.
+    date -= (i32)elk_days_since_epoch(year); // Now it's days since start of the year.
     Assert(date >= 0);
     Assert(year >= 1 && year <= INT16_MAX);
 
@@ -699,7 +699,7 @@ elk_make_struct_date(ElkDate date)
         if (sum_days_to_month[leap_year_idx][month + 1] > date) { break; }
     }
     Assert(date >= 0 && month >= 1 && month <= 12);
-    date -= sum_days_to_month[leap_year_idx][month]; // Now in days since start of month
+    date -= (i32)sum_days_to_month[leap_year_idx][month]; // Now in days since start of month
 
     // Calculate the day
     int const day = (int const)(date + 1);
@@ -728,13 +728,13 @@ elk_date_from_ymd(int year, int month, int day)
     Assert(month >= 1 && month <= 12);
 
     // Days in the years up to now.
-    i32 const num_leap_years_since_epoch = elk_num_leap_years_since_epoch(year);
+    i32 const num_leap_years_since_epoch = (i32)elk_num_leap_years_since_epoch(year);
     ElkDate dt = (year - 1) * 365 + num_leap_years_since_epoch;
 
     // Days in the months up to the start of this month
     i64 const days_until_start_of_month =
         elk_is_leap_year(year) ? sum_days_to_month[1][month] : sum_days_to_month[0][month];
-    dt += days_until_start_of_month;
+    dt += (i32)days_until_start_of_month;
 
     // Days in the days of the month up to this one.
     dt += (day - 1);
@@ -753,7 +753,7 @@ elk_date_to_unix_epoch(ElkDate date)
 static inline ElkDate 
 elk_date_from_unix_timestamp(i64 unixtime)
 {
-    return (unixtime + elk_unix_epoch_timestamp) / SECONDS_PER_DAY;
+    return (ElkDate)((unixtime + elk_unix_epoch_timestamp) / SECONDS_PER_DAY);
 }
 
 static inline ElkStr
