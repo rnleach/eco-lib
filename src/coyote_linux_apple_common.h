@@ -500,7 +500,10 @@ static inline void *
 coy_thread_func_internal(void *thread_params)
 {
     CoyThread *thrd = thread_params;
-    thrd->func(thrd->thread_data);
+    CoyThreadFunc func = thrd->func;
+    void *data = thrd->thread_data;
+
+    func(data);
 
     return NULL;
 }
@@ -508,10 +511,10 @@ coy_thread_func_internal(void *thread_params)
 static inline b32
 coy_thread_create(CoyThread *thrd, CoyThreadFunc func, void *thread_data)
 {
-    *thrd = (CoyThread){ .func=func, .thread_data=thread_data };
-
     _Static_assert(sizeof(pthread_t) <= sizeof(thrd->handle), "pthread_t doesn't fit in CoyThread");
     _Static_assert(_Alignof(pthread_t) <= 16, "pthread_t doesn't fit alignment in CoyThread");
+
+    *thrd = (CoyThread){ .func=func, .thread_data=thread_data };
 
     return 0 == pthread_create((pthread_t *)thrd->handle, NULL, coy_thread_func_internal, thrd);
 }
@@ -608,6 +611,50 @@ coy_condvar_destroy(CoyCondVar *cv)
     int status = pthread_cond_destroy((pthread_cond_t *)&cv->cond_var[0]);
     Assert(status == 0);
     cv->valid = false;
+}
+
+static inline void *
+coy_task_thread_func_internal(void *thread_params)
+{
+    CoyTaskThread *thrd = thread_params;
+    CoyChannel *in = thrd->input;
+    CoyChannel *out = thrd->output;
+    CoyTaskThreadFunc func = thrd->func;
+    void *data = thrd->thread_data;
+
+    func(data, in, out);
+
+    return NULL;
+}
+
+static inline b32
+coy_task_thread_create(CoyTaskThread *thrd, CoyTaskThreadFunc func, CoyChannel *in, CoyChannel *out, void *thread_data)
+{
+    *thrd = (CoyTaskThread){ .func=func, .input=in, .output=out, .thread_data=thread_data };
+
+    _Static_assert(sizeof(pthread_t) <= sizeof(thrd->handle), "pthread_t doesn't fit in CoyThread");
+    _Static_assert(_Alignof(pthread_t) <= 16, "pthread_t doesn't fit alignment in CoyThread");
+
+    if(in)  { coy_channel_register_receiver(in); }
+    if(out) { coy_channel_register_sender(out);  }
+
+    return 0 == pthread_create((pthread_t *)thrd->handle, NULL, coy_task_thread_func_internal, thrd);
+}
+
+static inline b32
+coy_task_thread_join(CoyTaskThread *thread)
+{
+
+    pthread_t *t = (pthread_t  *)thread->handle;
+    int status = pthread_join(*t, NULL);
+    if(status == 0) { return true; }
+    return false;
+}
+
+static inline void 
+coy_task_thread_destroy(CoyTaskThread *thread)
+{
+    *thread = (CoyTaskThread){0};
 }
 
 static inline u64

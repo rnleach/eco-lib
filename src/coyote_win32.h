@@ -738,6 +738,70 @@ coy_condvar_destroy(CoyCondVar *cv)
     cv->valid = false;
 }
 
+static inline u32 
+coy_task_thread_func_internal(void *thread_params)
+{
+    CoyTaskThread *thrd = thread_params;
+    CoyTaskThreadFunc func = thrd->func;
+    CoyChannel *in = thrd->input;
+    CoyChannel *out = thrd->output;
+    void *data = thrd->thread_data;
+
+    func(data, in, out);
+
+    return 0;
+}
+
+
+static inline b32
+coy_task_thread_create(CoyTaskThread *thrd, CoyTaskThreadFunc func, CoyChannel *in, CoyChannel *out, void *thread_data)
+{
+    thrd->func = func;
+    thrd->thread_data = thread_data;
+    thrd->input = in;
+    thrd->output = out;
+
+    if(in)  { coy_channel_register_receiver(in); }
+    if(out) { coy_channel_register_sender(out);  }
+
+    DWORD id = 0;
+    HANDLE h =  CreateThread(
+        NULL,                            // [in, optional]  LPSECURITY_ATTRIBUTES   lpThreadAttributes,
+        0,                               // [in]            SIZE_T                  dwStackSize,
+        coy_task_thread_func_internal,   // [in]            LPTHREAD_START_ROUTINE  lpStartAddress,
+        thrd,                            // [in, optional]  __drv_aliasesMem LPVOID lpParameter,
+        0,                               // [in]            DWORD                   dwCreationFlags,
+        &id                              // [out, optional] LPDWORD                 lpThreadId
+    );
+
+    if(h == INVALID_HANDLE_VALUE)
+    {
+        return false;
+    }
+
+    _Static_assert(sizeof(h) <= sizeof(thrd->handle), "handle doesn't fit in CoyThread");
+    _Static_assert(_Alignof(HANDLE) <= 16, "handle doesn't fit alignment in CoyThread");
+    memcpy(&thrd->handle[0], &h, sizeof(h));
+
+    return true;
+}
+
+static inline b32
+coy_task_thread_join(CoyTaskThread *thread)
+{
+    HANDLE *h = (HANDLE *)&thread->handle[0];
+    DWORD status = WaitForSingleObject(*h, INFINITE);
+    return status == WAIT_OBJECT_0;
+}
+
+static inline void 
+coy_task_thread_destroy(CoyTaskThread *thread)
+{
+    HANDLE *h = (HANDLE *)&thread->handle[0];
+    /* BOOL success = */ CloseHandle(*h);
+    *thread = (CoyTaskThread){0};
+}
+
 static inline u64
 coy_profile_read_cpu_timer(void)
 {

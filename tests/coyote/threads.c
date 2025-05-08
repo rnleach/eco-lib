@@ -70,10 +70,12 @@ test_single_producer_single_consumer(i32 num_to_send)
     coy_channel_register_receiver(&chan);
     Assert(success);
 
-    success = coy_thread_join(&producer_thread);
+    success = eco_thread_join(&producer_thread);
+    eco_thread_destroy(&producer_thread);
     Assert(success);
 
-    success = coy_thread_join(&consumer_thread);
+    success = eco_thread_join(&consumer_thread);
+    eco_thread_destroy(&consumer_thread);
     Assert(success);
 
     coy_channel_destroy(&chan, NULL, NULL);
@@ -102,12 +104,14 @@ test_single_producer_multiple_consumer(i32 num_to_send)
         Assert(success);
     }
 
-    success = coy_thread_join(&producer_thread);
+    success = eco_thread_join(&producer_thread);
+    eco_thread_destroy(&producer_thread);
     Assert(success);
 
     for(i32 i = 0; i < 4; ++i)
     {
-        success = coy_thread_join(&consumer_threads[i]);
+        success = eco_thread_join(&consumer_threads[i]);
+        eco_thread_destroy(&consumer_threads[i]);
         Assert(success);
     }
 
@@ -146,11 +150,13 @@ test_multiple_producer_single_consumer(i32 num_to_send)
 
     for(i32 i = 0; i < 4; ++i)
     {
-        success = coy_thread_join(&producer_threads[i]);
+        success = eco_thread_join(&producer_threads[i]);
+        eco_thread_destroy(&producer_threads[i]);
         Assert(success);
     }
 
-    success = coy_thread_join(&consumer_thread);
+    success = eco_thread_join(&consumer_thread);
+    eco_thread_destroy(&consumer_thread);
     Assert(success);
 
     coy_channel_destroy(&chan, NULL, NULL);
@@ -186,13 +192,218 @@ test_multiple_producer_multiple_consumer(i32 num_to_send)
 
     for(i32 i = 0; i < 4; ++i)
     {
-        success = coy_thread_join(&producer_threads[i]);
+        success = eco_thread_join(&producer_threads[i]);
+        eco_thread_destroy(&producer_threads[i]);
         Assert(success);
     }
 
     for(i32 i = 0; i < 4; ++i)
     {
-        success = coy_thread_join(&consumer_threads[i]);
+        success = eco_thread_join(&consumer_threads[i]);
+        eco_thread_destroy(&consumer_threads[i]);
+        Assert(success);
+    }
+
+    coy_channel_destroy(&chan, NULL, NULL);
+
+    u64 total = 0;
+    for(i32 i = 0; i < 4; ++i)
+    {
+        total += cdata[i].num_received;
+    }
+
+    Assert(total == 4 * num_to_send);
+}
+
+/*--------------------------------------------------------------------------------------------------------------------------
+ *
+ *                                               Tests for Task Threads
+ *
+ *-------------------------------------------------------------------------------------------------------------------------*/
+typedef struct
+{
+    u64 num_to_send;
+} ProducerTaskThreadData;
+
+typedef struct
+{
+    u64 num_received;
+} ConsumerTaskThreadData;
+
+static void
+task_producer(void *data, CoyChannel *in, CoyChannel *outbound)
+{
+    ProducerTaskThreadData *pdata = data;
+    u64 num_to_send = pdata->num_to_send;
+
+    coy_channel_wait_until_ready_to_send(outbound);
+
+    b32 success = true;
+    for(u64 i = 0; i < num_to_send && success; ++i)
+    {
+        success = coy_channel_send(outbound, (void *) 1);
+        Assert(success);
+    }
+
+    coy_channel_done_sending(outbound);
+}
+
+static void
+task_consumer(void *data, CoyChannel *inbound, CoyChannel *out)
+{
+    ConsumerTaskThreadData *cdata = data;
+
+    coy_channel_wait_until_ready_to_receive(inbound);
+
+    void *val;
+    while(coy_channel_receive(inbound, &val))
+    {
+        cdata->num_received += (u64)val;
+    }
+
+    coy_channel_done_receiving(inbound);
+}
+
+static void
+test_task_single_producer_single_consumer(i32 num_to_send)
+{
+    CoyChannel chan = coy_channel_create();
+
+    ProducerTaskThreadData pdata = { .num_to_send = num_to_send };
+    CoyTaskThread producer_thread = {0};
+    b32 success = coy_task_thread_create(&producer_thread, task_producer, NULL, &chan, &pdata);
+    Assert(success);
+
+    ConsumerTaskThreadData cdata = { .num_received = 0 };
+    CoyTaskThread consumer_thread = {0};
+    success = coy_task_thread_create(&consumer_thread, task_consumer, &chan, NULL, &cdata);
+    Assert(success);
+
+    success = eco_thread_join(&producer_thread);
+    eco_thread_destroy(&producer_thread);
+    Assert(success);
+
+    success = eco_thread_join(&consumer_thread);
+    eco_thread_destroy(&consumer_thread);
+    Assert(success);
+
+    coy_channel_destroy(&chan, NULL, NULL);
+
+    Assert(cdata.num_received == num_to_send);
+}
+
+static void
+test_task_single_producer_multiple_consumer(i32 num_to_send)
+{
+    CoyChannel chan = coy_channel_create();
+
+    ProducerTaskThreadData pdata = { .num_to_send = num_to_send };
+    CoyTaskThread producer_thread = {0};
+    b32 success = coy_task_thread_create(&producer_thread, task_producer, NULL, &chan, &pdata);
+    Assert(success);
+
+    ConsumerTaskThreadData cdata[4] = {0};
+    CoyTaskThread consumer_threads[4] = {0};
+    for(i32 i = 0; i < 4; ++i)
+    {
+        cdata[i] = (ConsumerTaskThreadData){ .num_received = 0 };
+        success = coy_task_thread_create(&consumer_threads[i], task_consumer, &chan, NULL, &cdata[i]);
+        Assert(success);
+    }
+
+    success = eco_thread_join(&producer_thread);
+    eco_thread_destroy(&producer_thread);
+    Assert(success);
+
+    for(i32 i = 0; i < 4; ++i)
+    {
+        success = eco_thread_join(&consumer_threads[i]);
+        eco_thread_destroy(&consumer_threads[i]);
+        Assert(success);
+    }
+
+    coy_channel_destroy(&chan, NULL, NULL);
+
+    u64 total = 0;
+    for(i32 i = 0; i < 4; ++i)
+    {
+        total += cdata[i].num_received;
+    }
+
+    Assert(total == num_to_send);
+}
+
+static void
+test_task_multiple_producer_single_consumer(i32 num_to_send)
+{
+    CoyChannel chan = coy_channel_create();
+
+    b32 success = true;
+    ProducerTaskThreadData pdata[4] = {0};
+    CoyTaskThread producer_threads[4] = {0};
+    for(i32 i = 0; i < 4; ++i)
+    {
+        pdata[i] = (ProducerTaskThreadData){ .num_to_send = num_to_send };
+        success = coy_task_thread_create(&producer_threads[i], task_producer, NULL, &chan, &pdata[i]);
+        Assert(success);
+    }
+
+    ConsumerTaskThreadData cdata = { .num_received = 0 };
+    CoyTaskThread consumer_thread = {0};
+    success = coy_task_thread_create(&consumer_thread, task_consumer, &chan, NULL, &cdata);
+    Assert(success);
+
+    for(i32 i = 0; i < 4; ++i)
+    {
+        success = eco_thread_join(&producer_threads[i]);
+        eco_thread_destroy(&producer_threads[i]);
+        Assert(success);
+    }
+
+    success = eco_thread_join(&consumer_thread);
+    eco_thread_destroy(&consumer_thread);
+    Assert(success);
+
+    coy_channel_destroy(&chan, NULL, NULL);
+
+    Assert(cdata.num_received == 4 * num_to_send);
+}
+
+static void
+test_task_multiple_producer_multiple_consumer(i32 num_to_send)
+{
+    CoyChannel chan = coy_channel_create();
+
+    b32 success = true;
+    ProducerTaskThreadData pdata[4] = {0};
+    CoyTaskThread producer_threads[4] = {0};
+    for(i32 i = 0; i < 4; ++i)
+    {
+        pdata[i] = (ProducerTaskThreadData){ .num_to_send = num_to_send };
+        success = coy_task_thread_create(&producer_threads[i], task_producer, NULL, &chan, &pdata[i]);
+        Assert(success);
+    }
+
+    ConsumerTaskThreadData cdata[4] = {0};
+    CoyTaskThread consumer_threads[4] = {0};
+    for(i32 i = 0; i < 4; ++i)
+    {
+        cdata[i] = (ConsumerTaskThreadData){ .num_received = 0 };
+        success = coy_task_thread_create(&consumer_threads[i], task_consumer, &chan, NULL, &cdata[i]);
+        Assert(success);
+    }
+
+    for(i32 i = 0; i < 4; ++i)
+    {
+        success = eco_thread_join(&producer_threads[i]);
+        eco_thread_destroy(&producer_threads[i]);
+        Assert(success);
+    }
+
+    for(i32 i = 0; i < 4; ++i)
+    {
+        success = eco_thread_join(&consumer_threads[i]);
+        eco_thread_destroy(&consumer_threads[i]);
         Assert(success);
     }
 
@@ -226,5 +437,20 @@ coyote_threads_tests(void)
     fprintf(stderr,".mpmc..");
     test_multiple_producer_multiple_consumer(1000000);
     test_multiple_producer_multiple_consumer(10);
+
+    fprintf(stderr,".task spsc..");
+    test_task_single_producer_single_consumer(1000000);
+    test_task_single_producer_single_consumer(10);
+    fprintf(stderr,".task spmc..");
+    test_task_single_producer_multiple_consumer(1000000);
+    test_task_single_producer_multiple_consumer(10);
+    fprintf(stderr,".task mpsc 1000000..");
+    test_task_multiple_producer_single_consumer(1000000);
+    fprintf(stderr,".task mpsc 10..");
+    test_task_multiple_producer_single_consumer(10);
+    fprintf(stderr,".task mpmc..");
+    test_task_multiple_producer_multiple_consumer(1000000);
+    test_task_multiple_producer_multiple_consumer(10);
+
 }
 

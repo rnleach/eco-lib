@@ -256,12 +256,48 @@ static inline CoyChannel coy_channel_create(void);
 static inline void coy_channel_destroy(CoyChannel *chan, void(*free_func)(void *ptr, void *ctx), void *free_ctx);
 static inline void coy_channel_wait_until_ready_to_receive(CoyChannel *chan);
 static inline void coy_channel_wait_until_ready_to_send(CoyChannel *chan);
-static inline void coy_channel_register_sender(CoyChannel *chan);
-static inline void coy_channel_register_receiver(CoyChannel *chan);
-static inline void coy_channel_done_sending(CoyChannel *chan);
-static inline void coy_channel_done_receiving(CoyChannel *chan);
+static inline void coy_channel_register_sender(CoyChannel *chan);   /* Call from thread that created channel, not the one using it. */
+static inline void coy_channel_register_receiver(CoyChannel *chan); /* Call from thread that created channel, not the one using it. */
+static inline void coy_channel_done_sending(CoyChannel *chan);      /* Call from the channel using the channel.                     */
+static inline void coy_channel_done_receiving(CoyChannel *chan);    /* Call from the channel using the channel.                     */
 static inline b32 coy_channel_send(CoyChannel *chan, void *data);
 static inline b32 coy_channel_receive(CoyChannel *chan, void **out);
+
+/*---------------------------------------------------------------------------------------------------------------------------
+ *                                                      Task Thread
+ *---------------------------------------------------------------------------------------------------------------------------
+ * A thread paired with input and output channels. The channels need to be set up separately. This is useful for building
+ * pipeline style concurrency. Since CoyChannel is multi-producer, multi-consumer channel, each stage of a pipeline can
+ * fork out for parallelism or fork in for aggregation.
+ *
+ * The create function takes care of calling register sender / receiver on the channels for the user, but the user must
+ * must still call the *done* sending / receiving functions from inside the CoyTaskThreadFunc.
+ */
+
+typedef void (*CoyTaskThreadFunc)(void *thread_data, CoyChannel *input, CoyChannel *output);
+
+typedef struct
+{
+    _Alignas(16) byte handle[32];
+    CoyTaskThreadFunc func;
+    CoyChannel *input;
+    CoyChannel *output;
+    void *thread_data;
+} CoyTaskThread;
+
+static inline b32 coy_task_thread_create(CoyTaskThread *thread, CoyTaskThreadFunc func, CoyChannel *in, CoyChannel *out, void *thread_data);
+static inline b32 coy_task_thread_join(CoyTaskThread *thread);
+static inline void coy_task_thread_destroy(CoyTaskThread *thread);
+
+#define eco_thread_join(thrd) _Generic((thrd),                                                                              \
+                                CoyThread *: coy_thread_join,                                                               \
+                                CoyTaskThread *: coy_task_thread_join                                                       \
+                              )(thrd)
+
+#define eco_thread_destroy(thrd) _Generic((thrd),                                                                           \
+                                   CoyThread *: coy_thread_destroy,                                                         \
+                                   CoyTaskThread *: coy_task_thread_destroy                                                 \
+                                 )(thrd)
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                    Profiling Tools
