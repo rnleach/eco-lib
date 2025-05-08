@@ -89,11 +89,13 @@ static inline void coy_file_reader_close(CoyFileReader *file);                  
 static inline size coy_file_slurp(char const *filename, byte **out, MagStaticArena *arena);   
 static inline ElkStr coy_file_slurp_text_static(char const *filename, MagStaticArena *arena);
 static inline ElkStr coy_file_slurp_text_dyn(char const *filename, MagDynArena *arena);
+static inline ElkStr coy_file_slurp_text_allocator(char const *filename, MagAllocator *alloc);
 
-#define eco_file_slurp_text(fname, arena) _Generic((arena),                                                                 \
+#define eco_file_slurp_text(fname, alloc) _Generic((alloc),                                                                 \
                                          MagStaticArena *: coy_file_slurp_text_static,                                      \
-                                         MagDynArena *:    coy_file_slurp_text_dyn                                          \
-                                         )(fname, arena)
+                                         MagDynArena *:    coy_file_slurp_text_dyn,                                         \
+                                         MagAllocator *:   coy_file_slurp_text_allocator                                    \
+                                         )(fname, alloc)
 
 
 
@@ -1005,7 +1007,6 @@ ERR_RETURN:
 static inline ElkStr 
 coy_file_slurp_text_static(char const *filename, MagStaticArena *arena)
 {
-
     size fsize = coy_file_size(filename);
     StopIf(fsize < 0, goto ERR_RETURN);
 
@@ -1024,7 +1025,6 @@ ERR_RETURN:
 static inline ElkStr 
 coy_file_slurp_text_dyn(char const *filename, MagDynArena *arena)
 {
-
     size fsize = coy_file_size(filename);
     StopIf(fsize < 0, goto ERR_RETURN);
 
@@ -1040,6 +1040,23 @@ ERR_RETURN:
     return (ElkStr){ .start = NULL, .len = 0 };
 }
 
+static inline ElkStr 
+coy_file_slurp_text_allocator(char const *filename, MagAllocator *alloc)
+{
+    size fsize = coy_file_size(filename);
+    StopIf(fsize < 0, goto ERR_RETURN);
+
+    byte *out = mag_allocator_nmalloc(alloc, fsize, byte);
+    StopIf(!out, goto ERR_RETURN);
+
+    size size_read = coy_file_slurp_internal(filename, fsize, out);
+    StopIf(fsize != size_read, goto ERR_RETURN);
+
+    return (ElkStr){ .start = out, .len = fsize };
+
+ERR_RETURN:
+    return (ElkStr){ .start = NULL, .len = 0 };
+}
 
 #if defined(_WIN32) || defined(_WIN64)
 

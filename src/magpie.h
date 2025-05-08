@@ -126,7 +126,6 @@ static inline void mag_static_arena_destroy_and_deallocate(MagStaticArena *arena
  * A dynamically growable arena allocator that works with the system allocator to grow indefinitely.
  */
 
-
 /* A dynamically size arena. */
 typedef struct MagDynArenaBlock MagDynArenaBlock;
 typedef struct
@@ -154,35 +153,74 @@ static inline void mag_dyn_arena_free(MagDynArena *arena, void *ptr);
 #define mag_dyn_arena_nmalloc(arena, count, type) (type *)mag_dyn_arena_alloc((arena), (count) * sizeof(type), _Alignof(type))
 #define mag_dyn_arena_nrealloc(arena, ptr, count, type) (type *) mag_dyn_arena_realloc((arena), (ptr), sizeof(type) * (count))
 
-#define eco_arena_malloc(arena, type) (type *) _Generic((arena),                                                            \
+/*---------------------------------------------------------------------------------------------------------------------------
+ *                                                 Generalized Allocator
+ *---------------------------------------------------------------------------------------------------------------------------
+ *
+ * A generalized interface to allocators.
+ */
+
+typedef enum { MAG_ALLOC_T_STATIC_ARENA, MAG_ALLOC_T_DYN_ARENA } MagAllocatorType;
+
+typedef struct
+{
+    MagAllocatorType type;
+    union
+    {
+        MagStaticArena static_arena;
+        MagDynArena dyn_arena;
+    };
+} MagAllocator;
+
+
+static inline void mag_allocator_dyn_arena_create(MagAllocator *alloc, size default_block_size);
+static inline void mag_allocator_static_arena_create(MagAllocator *alloc, size buf_size, byte buffer[]);
+
+static inline void mag_allocator_destroy(MagAllocator *arena);
+static inline void mag_allocator_reset(MagAllocator *arena); /* Clear all previous allocations. */
+static inline void *mag_allocator_alloc(MagAllocator *alloc, size num_bytes, size alignment);
+static inline void *mag_allocator_realloc(MagAllocator *alloc, void *ptr, size num_bytes);
+static inline void mag_allocator_free(MagAllocator *alloc, void *ptr);
+
+#define mag_allocator_malloc(arena, type) (type *)mag_allocator_alloc((arena), sizeof(type), _Alignof(type))
+#define mag_allocator_nmalloc(arena, count, type) (type *)mag_allocator_alloc((arena), (count) * sizeof(type), _Alignof(type))
+#define mag_allocator_nrealloc(arena, ptr, count, type) (type *) mag_allocator_realloc((arena), (ptr), sizeof(type) * (count))
+
+#define eco_malloc(alloc, type) (type *) _Generic((alloc),                                                                  \
                                                MagStaticArena *: mag_static_arena_alloc,                                    \
-                                               MagDynArena *:    mag_dyn_arena_alloc                                        \
-                                              )(arena, sizeof(type), _Alignof(type))
+                                               MagDynArena *:    mag_dyn_arena_alloc,                                       \
+                                               MagAllocator *:   mag_allocator_alloc                                        \
+                                              )(alloc, sizeof(type), _Alignof(type))
 
-#define eco_arena_nmalloc(arena, count, type) (type *) _Generic((arena),                                                    \
+#define eco_nmalloc(alloc, count, type) (type *) _Generic((alloc),                                                          \
                                                        MagStaticArena *: mag_static_arena_alloc,                            \
-                                                       MagDynArena *:    mag_dyn_arena_alloc                                \
-                                                      )(arena, (count) * sizeof(type), _Alignof(type))
+                                                       MagDynArena *:    mag_dyn_arena_alloc,                               \
+                                                       MagAllocator *:   mag_allocator_alloc                                \
+                                                      )(alloc, (count) * sizeof(type), _Alignof(type))
 
-#define eco_arena_nrealloc(arena, ptr, count, type) _Generic((arena),                                                       \
+#define eco_nrealloc(alloc, ptr, count, type) _Generic((alloc),                                                             \
                                                     MagStaticArena *: mag_static_arena_realloc,                             \
-                                                    MagDynArena *:    mag_dyn_arena_realloc                                 \
-                                                  )(arena, ptr, sizeof(type) * (count))
+                                                    MagDynArena *:    mag_dyn_arena_realloc,                                \
+                                                    MagAllocator *:   mag_allocator_realloc                                 \
+                                                  )(alloc, ptr, sizeof(type) * (count))
 
-#define eco_arena_destroy(arena) _Generic((arena),                                                                          \
+#define eco_destroy(alloc) _Generic((alloc),                                                                                \
                                  MagStaticArena *: mag_static_arena_destroy,                                                \
-                                 MagDynArena *:    mag_dyn_arena_destroy                                                    \
-                                )(arena)
+                                 MagDynArena *:    mag_dyn_arena_destroy,                                                   \
+                                 MagAllocator *:   mag_allocator_destroy                                                    \
+                                )(alloc)
 
-#define eco_arena_free(arena, ptr) _Generic((arena),                                                                        \
+#define eco_free(alloc, ptr) _Generic((alloc),                                                                              \
                                  MagStaticArena *: mag_static_arena_free,                                                   \
-                                 MagDynArena *:    mag_dyn_arena_free                                                       \
-                                )(arena, ptr)
+                                 MagDynArena *:    mag_dyn_arena_free,                                                      \
+                                 MagAllocator *:   mag_allocator_free                                                       \
+                                )(alloc, ptr)
 
-#define eco_arena_reset(arena) _Generic((arena),                                                                            \
+#define eco_reset(alloc) _Generic((alloc),                                                                                  \
                             MagStaticArena *: mag_static_arena_reset,                                                       \
-                            MagDynArena *:    mag_dyn_arena_reset_default                                                   \
-                           )(arena)
+                            MagDynArena *:    mag_dyn_arena_reset_default,                                                  \
+                            MagAllocator *:   mag_allocator_reset                                                           \
+                           )(alloc)
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                      String Slice
@@ -198,16 +236,21 @@ static inline ElkStr mag_str_append_static(ElkStr dest, ElkStr src, MagStaticAre
 static inline ElkStr mag_str_append_dyn(ElkStr dest, ElkStr src, MagDynArena *arena); 
 static inline ElkStr mag_str_alloc_copy_dyn(ElkStr src, MagDynArena *arena);
 
-/* Convenience functions. These may may be extended with _Generic in Magpie. */
-#define eco_str_append(dest, src, arena) _Generic((arena),                                                                  \
-                                         MagStaticArena *: mag_str_append_static,                                           \
-                                         MagDynArena *:    mag_str_append_dyn                                               \
-                                         )(dest, src, arena)
+static inline ElkStr mag_str_append_alloc(ElkStr dest, ElkStr src, MagAllocator *alloc); 
+static inline ElkStr mag_str_alloc_copy_alloc(ElkStr src, MagAllocator *alloc);
 
-#define eco_str_alloc_copy(src, arena) _Generic((arena),                                                              \
+/* Convenience functions. These may may be extended with _Generic in Magpie. */
+#define eco_str_append(dest, src, alloc) _Generic((alloc),                                                                  \
+                                         MagStaticArena *: mag_str_append_static,                                           \
+                                         MagDynArena *:    mag_str_append_dyn,                                              \
+                                         MagAllocator *:   mag_str_append_alloc                                             \
+                                         )(dest, src, alloc)
+
+#define eco_str_alloc_copy(src, alloc) _Generic((alloc),                                                                    \
                                          MagStaticArena *: mag_str_alloc_copy_static,                                       \
-                                         MagDynArena *:    mag_str_alloc_copy_dyn                                           \
-                                         )(src, arena)
+                                         MagDynArena *:    mag_str_alloc_copy_dyn,                                          \
+                                         MagAllocator *:   mag_str_alloc_copy_alloc                                         \
+                                         )(src, alloc)
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *
@@ -734,6 +777,74 @@ mag_dyn_arena_free(MagDynArena *arena, void *ptr)
     return;
 }
 
+static inline void 
+mag_allocator_dyn_arena_create(MagAllocator *alloc, size default_block_size)
+{
+    alloc->type = MAG_ALLOC_T_DYN_ARENA;
+    mag_dyn_arena_create(&alloc->dyn_arena, default_block_size);
+}
+
+static inline void 
+mag_allocator_static_arena_create(MagAllocator *alloc, size buf_size, byte buffer[])
+{
+    alloc->type = MAG_ALLOC_T_STATIC_ARENA;
+    mag_static_arena_create(&alloc->static_arena, buf_size, buffer);
+}
+
+static inline void 
+mag_allocator_destroy(MagAllocator *alloc)
+{
+    switch(alloc->type)
+    {
+        case MAG_ALLOC_T_STATIC_ARENA: mag_static_arena_destroy(&alloc->static_arena); break;
+        case MAG_ALLOC_T_DYN_ARENA:    mag_dyn_arena_destroy(&alloc->dyn_arena);       break;
+    }
+}
+
+static inline void 
+mag_allocator_reset(MagAllocator *alloc)
+{
+    switch(alloc->type)
+    {
+        case MAG_ALLOC_T_STATIC_ARENA: mag_static_arena_reset(&alloc->static_arena);   break;
+        case MAG_ALLOC_T_DYN_ARENA:    mag_dyn_arena_reset_default(&alloc->dyn_arena); break;
+    }
+}
+
+static inline void *
+mag_allocator_alloc(MagAllocator *alloc, size num_bytes, size alignment)
+{
+    switch(alloc->type)
+    {
+        case MAG_ALLOC_T_STATIC_ARENA: return mag_static_arena_alloc(&alloc->static_arena, num_bytes, alignment);
+        case MAG_ALLOC_T_DYN_ARENA:    return mag_dyn_arena_alloc(&alloc->dyn_arena, num_bytes, alignment);
+    }
+
+    return NULL;
+}
+
+static inline void *
+mag_allocator_realloc(MagAllocator *alloc, void *ptr, size num_bytes)
+{
+    switch(alloc->type)
+    {
+        case MAG_ALLOC_T_STATIC_ARENA: return mag_static_arena_realloc(&alloc->static_arena, ptr, num_bytes);
+        case MAG_ALLOC_T_DYN_ARENA:    return mag_dyn_arena_realloc(&alloc->dyn_arena, ptr, num_bytes);
+    }
+
+    return NULL;
+}
+
+static inline void 
+mag_allocator_free(MagAllocator *alloc, void *ptr)
+{
+    switch(alloc->type)
+    {
+        case MAG_ALLOC_T_STATIC_ARENA: mag_static_arena_free(&alloc->static_arena, ptr); break;
+        case MAG_ALLOC_T_DYN_ARENA:    mag_dyn_arena_free(&alloc->dyn_arena, ptr);       break;
+    }
+}
+
 static inline ElkStr 
 mag_str_alloc_copy_static(ElkStr src, MagStaticArena *arena)
 {
@@ -816,6 +927,60 @@ mag_str_alloc_copy_dyn(ElkStr src, MagDynArena *arena)
 
     size copy_len = src.len + 1; // Add room for terminating zero.
     char *buffer = mag_dyn_arena_nmalloc(arena, copy_len, char);
+    StopIf(!buffer, return ret_val); // Return NULL string if out of memory
+
+    ret_val = elk_str_copy(copy_len, buffer, src);
+
+    return ret_val;
+}
+
+static inline ElkStr 
+mag_str_append_alloc(ElkStr dest, ElkStr src, MagAllocator *alloc)
+{
+    ElkStr result = {0};
+
+    if(src.len <= 0) { return result; }
+
+    size new_len = dest.len + src.len;
+    char *buf = dest.start;
+    buf = mag_allocator_nrealloc(alloc, buf, new_len, char);
+
+    if(!buf)
+    { 
+        /* Failed to grow in place. */
+        buf = mag_allocator_nmalloc(alloc, new_len, char);
+        if(buf)
+        {
+            char *dest_ptr = buf;
+            memcpy(dest_ptr, dest.start, dest.len);
+            dest_ptr = dest_ptr + dest.len;
+            memcpy(dest_ptr, src.start, src.len);
+
+            result.start = buf;
+            result.len = new_len;
+        }
+
+        /* else leave result as empty - a null string. */
+    }
+    else
+    {
+        /* Grew in place! */
+        result.start = buf;
+        result.len = new_len;
+        char *dest_ptr = dest.start + dest.len;
+        memcpy(dest_ptr, src.start, src.len);
+    }
+
+    return result;
+}
+
+static inline ElkStr 
+mag_str_alloc_copy_alloc(ElkStr src, MagAllocator *alloc)
+{
+    ElkStr ret_val = {0};
+
+    size copy_len = src.len + 1; // Add room for terminating zero.
+    char *buffer = mag_allocator_nmalloc(alloc, copy_len, char);
     StopIf(!buffer, return ret_val); // Return NULL string if out of memory
 
     ret_val = elk_str_copy(copy_len, buffer, src);

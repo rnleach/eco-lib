@@ -24,9 +24,10 @@ test_string_interner(void)
     ElkStr strs[sizeof(some_strings) / sizeof(some_strings[0])] = {0};
 
     byte buffer[ECO_KB(2)] = {0};
-    MagStaticArena arena_i = {0};
-    MagStaticArena *arena = &arena_i;
-    mag_static_arena_create(arena, sizeof(buffer), buffer);
+    MagAllocator arena_i = {0};
+    MagAllocator *arena = &arena_i;
+    mag_allocator_static_arena_create(arena, sizeof(buffer), buffer);
+
     PakStringInterner interner = pak_string_interner_create(3, arena);
     PakStringInterner *internerp = &interner;
 
