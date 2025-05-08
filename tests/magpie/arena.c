@@ -43,9 +43,8 @@ static void
 test_arena(void)
 {
     byte arena_buffer[ECO_KB(1)] = {0};
-    MagStaticArena arena_i = {0};
+    MagStaticArena arena_i = mag_static_arena_create(sizeof(arena_buffer), arena_buffer);
     MagStaticArena *arena = &arena_i;
-    mag_static_arena_create(arena, sizeof(arena_buffer), arena_buffer);
 
     for (i32 trip_num = 1; trip_num <= 5; trip_num++) 
     {
@@ -105,10 +104,8 @@ static void
 test_static_arena_realloc(void)
 {
     _Alignas(_Alignof(f64)) byte buffer[100 * sizeof(f64)];
-    MagStaticArena arena_instance = {0};
+    MagStaticArena arena_instance = mag_static_arena_create(sizeof(buffer), buffer);
     MagStaticArena *arena = &arena_instance;
-
-    mag_static_arena_create(arena, sizeof(buffer), buffer);
 
     f64 *ten_dubs = mag_static_arena_nmalloc(arena, 10, f64);
     Assert(ten_dubs);
@@ -157,10 +154,8 @@ static void
 test_static_arena_free(void)
 {
     byte buffer[10 * sizeof(f64)];
-    MagStaticArena arena_instance = {0};
+    MagStaticArena arena_instance = mag_static_arena_create(sizeof(buffer), buffer);
     MagStaticArena *arena = &arena_instance;
-
-    mag_static_arena_create(arena, sizeof(buffer), buffer);
 
     f64 *first = mag_static_arena_malloc(arena, f64);
     Assert(first);

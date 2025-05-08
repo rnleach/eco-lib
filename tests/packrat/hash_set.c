@@ -36,9 +36,8 @@ test_pak_hash_set(void)
     }
 
     byte buffer[ECO_KB(1)] = {0};
-    MagAllocator arena_i = {0};
+    MagAllocator arena_i = mag_allocator_static_arena_create(sizeof(buffer), buffer);
     MagAllocator *arena = &arena_i;
-    mag_allocator_static_arena_create(arena, sizeof(buffer), buffer);
 
     PakHashSet set_ = pak_hash_set_create(2, simple_str_hash, str_eq, arena);
     PakHashSet *set = &set_;
@@ -73,9 +72,8 @@ test_pak_hash_set_iter(void)
     }
 
     byte buffer[ECO_KB(1)] = {0};
-    MagAllocator arena_i = {0};
+    MagAllocator arena_i = mag_allocator_static_arena_create(sizeof(buffer), buffer);
     MagAllocator *arena = &arena_i;
-    mag_allocator_static_arena_create(arena, sizeof(buffer), buffer);
 
     PakHashSet set_ = pak_hash_set_create(2, simple_str_hash, str_eq, arena);
     PakHashSet *set = &set_;

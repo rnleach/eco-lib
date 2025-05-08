@@ -24,9 +24,8 @@ test_elk_str_table(void)
     i64 values2[sizeof(some_strings_ht) / sizeof(some_strings_ht[0])] = {0};
 
     byte buffer[ECO_KB(2)] = {0};
-    MagAllocator arena_i = {0};
+    MagAllocator arena_i = mag_allocator_static_arena_create(sizeof(buffer), buffer);
     MagAllocator *arena = &arena_i;
-    mag_allocator_static_arena_create(arena, sizeof(buffer), buffer);
 
     PakStrMap map_ = pak_str_map_create(2, arena); // Use a crazy small size_exp to force it to grow, this IS a test!
     PakStrMap *map = &map_;
@@ -72,9 +71,8 @@ test_elk_str_key_iterator(void)
     i64 values[sizeof(some_strings_ht) / sizeof(some_strings_ht[0])] = {0};
 
     byte buffer[ECO_KB(2)] = {0};
-    MagAllocator arena_i = {0};
+    MagAllocator arena_i = mag_allocator_static_arena_create(sizeof(buffer), buffer);
     MagAllocator *arena = &arena_i;
-    mag_allocator_static_arena_create(arena, sizeof(buffer), buffer);
 
     PakStrMap map_ = pak_str_map_create(2, arena); // Use a crazy small size_exp to force it to grow, this IS a test!
     PakStrMap *map = &map_;
@@ -119,9 +117,8 @@ test_elk_str_handle_iterator(void)
     i64 values[sizeof(some_strings_ht) / sizeof(some_strings_ht[0])] = {0};
 
     byte buffer[ECO_KB(2)] = {0};
-    MagAllocator arena_i = {0};
+    MagAllocator arena_i = mag_allocator_static_arena_create(sizeof(buffer), buffer);
     MagAllocator *arena = &arena_i;
-    mag_allocator_static_arena_create(arena, sizeof(buffer), buffer);
 
     PakStrMap map_ = pak_str_map_create(2, arena); // Use a crazy small size_exp to force it to grow, this IS a test!
     PakStrMap *map = &map_;
@@ -189,9 +186,8 @@ test_pak_hash_table(void)
 
     // Set up memory
     byte buffer[ECO_KB(2)] = {0};
-    MagAllocator arena_i = {0};
+    MagAllocator arena_i = mag_allocator_static_arena_create(sizeof(buffer), buffer);
     MagAllocator *arena = &arena_i;
-    mag_allocator_static_arena_create(arena, sizeof(buffer), buffer);
 
     // Fill the hashmap
     PakHashMap map_ = pak_hash_map_create(2, id_hash, int64_eq, arena);
@@ -236,9 +232,8 @@ test_pak_hash_key_iterator(void)
 
     // Set up memory
     byte buffer[ECO_KB(2)] = {0};
-    MagAllocator arena_i = {0};
+    MagAllocator arena_i = mag_allocator_static_arena_create(sizeof(buffer), buffer);
     MagAllocator *arena = &arena_i;
-    mag_allocator_static_arena_create(arena, sizeof(buffer), buffer);
 
     // Fill the hashmap
     PakHashMap map_ = pak_hash_map_create(2, id_hash, int64_eq, arena);

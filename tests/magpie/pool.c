@@ -10,11 +10,9 @@
 static void
 test_full_pool(void)
 {
-    MagStaticPool pool_obj = {0};
-    MagStaticPool *pool = &pool_obj;
     _Alignas(_Alignof(f64)) byte buffer[TEST_BUF_COUNT * sizeof(f64)] = {0};
-
-    mag_static_pool_create(pool, sizeof(f64), TEST_BUF_COUNT, buffer);
+    MagStaticPool pool_obj = mag_static_pool_create(sizeof(f64), TEST_BUF_COUNT, buffer);
+    MagStaticPool *pool = &pool_obj;
 
     f64 *dubs[TEST_BUF_COUNT] = {0};
 
@@ -44,11 +42,9 @@ test_full_pool(void)
 static void
 test_pool_freeing(void)
 {
-    MagStaticPool pool_obj = {0};
-    MagStaticPool *pool = &pool_obj;
     _Alignas(_Alignof(f64)) byte buffer[TEST_BUF_COUNT * sizeof(f64)] = {0};
-
-    mag_static_pool_create(pool, sizeof(f64), TEST_BUF_COUNT, buffer);
+    MagStaticPool pool_obj = mag_static_pool_create(sizeof(f64), TEST_BUF_COUNT, buffer);
+    MagStaticPool *pool = &pool_obj;
 
     f64 *dubs[TEST_BUF_COUNT] = {0};
 
