@@ -14,6 +14,22 @@
 
 
 /*---------------------------------------------------------------------------------------------------------------------------
+ *                                                         Memory
+ *---------------------------------------------------------------------------------------------------------------------------
+ * Request big chunks of memory from the OS, bypassing the CRT. The system may round up your requested memory size, but it
+ * will return an error instead of rounding down if there isn't enough memory.
+ */
+typedef struct
+{
+    void *mem;
+    size size;
+    b32 valid;
+} MagMemoryBlock;
+
+static inline MagMemoryBlock mag_sys_memory_allocate(size minimum_num_bytes);
+static inline void mag_sys_memory_free(MagMemoryBlock *mem);
+
+/*---------------------------------------------------------------------------------------------------------------------------
  *                                                 Static Arena Allocator
  *---------------------------------------------------------------------------------------------------------------------------
  *
@@ -44,10 +60,10 @@ typedef struct
 
 static inline MagStaticArena mag_static_arena_create(size buf_size, byte buffer[]);
 static inline void mag_static_arena_destroy(MagStaticArena *arena);
-static inline void mag_static_arena_reset(MagStaticArena *arena);                                  // Set offset to 0, invalidates all previous allocations
-static inline void *mag_static_arena_alloc(MagStaticArena *arena, size num_bytes, size alignment); // ret NULL if OOM
-static inline void *mag_static_arena_realloc(MagStaticArena *arena, void *ptr, size asize);        // ret NULL if ptr is not most recent allocation
-static inline void mag_static_arena_free(MagStaticArena *arena, void *ptr);                        // Undo if it was last allocation, otherwise no-op
+static inline void mag_static_arena_reset(MagStaticArena *arena);                                  /* Set offset to 0, invalidates all previous allocations */
+static inline void *mag_static_arena_alloc(MagStaticArena *arena, size num_bytes, size alignment); /* ret NULL if out of memory (OOM)                       */
+static inline void *mag_static_arena_realloc(MagStaticArena *arena, void *ptr, size asize);        /* ret NULL if ptr is not most recent allocation         */
+static inline void mag_static_arena_free(MagStaticArena *arena, void *ptr);                        /* Undo if it was last allocation, otherwise no-op       */
 
 /* Also see eco_arena_malloc and related macros below. */
 #define mag_static_arena_malloc(arena, type) (type *)mag_static_arena_alloc((arena), sizeof(type), _Alignof(type))
@@ -60,6 +76,12 @@ static size mag_static_arena_metrics_next = 0;
 static inline f64 mag_static_arena_max_ratio(MagStaticArena *arena);
 static inline b32 mag_static_arena_over_allocated(MagStaticArena *arena);
 #endif
+
+/*
+ * Allocate some memory from the heap and manage it with an MagStaticArena.
+ */
+static inline MagStaticArena mag_static_arena_allocate_and_create(size num_bytes);
+static inline void mag_static_arena_destroy_and_deallocate(MagStaticArena *arena);
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                  Static Pool Allocator
@@ -80,44 +102,20 @@ static inline b32 mag_static_arena_over_allocated(MagStaticArena *arena);
  */
 typedef struct 
 {
-    size object_size;    // The size of each object
-    size num_objects;    // The capacity, or number of objects storable in the pool
-    void *free;          // The head of a free list of available slots for objects
-    byte *buffer;        // The buffer we actually store the data in
+    size object_size;    /* The size of each object                                 */
+    size num_objects;    /* The capacity, or number of objects storable in the pool */
+    void *free;          /* The head of a free list of available slots for objects  */
+    byte *buffer;        /* The buffer we actually store the data in                */
 } MagStaticPool;
 
 static inline MagStaticPool mag_static_pool_create(size object_size, size num_objects, byte buffer[]);
 static inline void mag_static_pool_destroy(MagStaticPool *pool);
 static inline void mag_static_pool_reset(MagStaticPool *pool);
 static inline void mag_static_pool_free(MagStaticPool *pool, void *ptr);
-static inline void * mag_static_pool_alloc(MagStaticPool *pool); // returns NULL if there's no more space available.
-// no mag_static_pool_realloc because that doesn't make sense!
+static inline void * mag_static_pool_alloc(MagStaticPool *pool); /* returns NULL if there's no more space available. */
+/* no mag_static_pool_realloc because that doesn't make sense! */
 
 #define mag_static_pool_malloc(alloc, type) (type *)mag_static_pool_alloc(alloc)
-
-/*---------------------------------------------------------------------------------------------------------------------------
- *                                                         Memory
- *---------------------------------------------------------------------------------------------------------------------------
- * Request big chunks of memory from the OS, bypassing the CRT. The system may round up your requested memory size, but it
- * will return an error instead of rounding down if there isn't enough memory.
- */
-typedef struct
-{
-    void *mem;
-    size size;
-    b32 valid;
-} MagMemoryBlock;
-
-static inline MagMemoryBlock mag_sys_memory_allocate(size minimum_num_bytes);
-static inline void mag_sys_memory_free(MagMemoryBlock *mem);
-
-/*---------------------------------------------------------------------------------------------------------------------------
- *                                                Static Arena Allocator
- *---------------------------------------------------------------------------------------------------------------------------
- * Allocate some memory from the heap and manage it with an MagStaticArena.
- */
-static inline MagStaticArena mag_static_arena_allocate_and_create(size num_bytes);
-static inline void mag_static_arena_destroy_and_deallocate(MagStaticArena *arena);
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                Dynamic Arena Allocator
@@ -277,11 +275,11 @@ mag_align_pointer(uptr ptr, usize align)
     Assert(mag_is_power_of_2(align));
 
     uptr a = (uptr)align;
-    uptr mod = ptr & (a - 1); // Same as (ptr % a) but faster as 'a' is a power of 2
+    uptr mod = ptr & (a - 1); /* Same as (ptr % a) but faster as 'a' is a power of 2 */
 
     if (mod != 0)
     {
-        // push the address forward to the next value which is aligned
+        /* push the address forward to the next value which is aligned               */
         ptr += a - mod;
     }
 
@@ -327,12 +325,12 @@ mag_static_arena_alloc(MagStaticArena *arena, size num_bytes, size alignment)
 {
     Assert(num_bytes > 0 && alignment > 0);
 
-    // Align 'curr_offset' forward to the specified alignment
+    /* Align 'curr_offset' forward to the specified alignment */
     uptr curr_ptr = (uptr)arena->buffer + (uptr)arena->buf_offset;
     uptr offset = mag_align_pointer(curr_ptr, alignment);
-    offset -= (uptr)arena->buffer; // change to relative offset
+    offset -= (uptr)arena->buffer; /* change to relative offset */
 
-    // Check to see if there is enough space left
+    /* Check to see if there is enough space left */
     if ((size)(offset + num_bytes) <= arena->buf_size)
     {
         void *ptr = &arena->buffer[offset];
@@ -364,10 +362,10 @@ mag_static_arena_realloc(MagStaticArena *arena, void *ptr, size asize)
 
     if(ptr == arena->prev_ptr)
     {
-        // Get previous extra offset due to alignment
-        uptr offset = (uptr)ptr - (uptr)arena->buffer; // relative offset accounting for alignment
+        /* Get previous extra offset due to alignment */
+        uptr offset = (uptr)ptr - (uptr)arena->buffer; /* relative offset accounting for alignment */
 
-        // Check to see if there is enough space left
+        /* Check to see if there is enough space left */
         if ((size)(offset + asize) <= arena->buf_size)
         {
             arena->buf_offset = offset + asize;
@@ -421,14 +419,14 @@ static inline void
 mag_static_pool_initialize_linked_list(byte *buffer, size object_size, size num_objects)
 {
 
-    // Initialize the free list to a linked list.
+    /* Initialize the free list to a linked list. */
 
-    // start by pointing to last element and assigning it NULL
+    /* start by pointing to last element and assigning it NULL */
     size offset = object_size * (num_objects - 1);
     uptr *ptr = (uptr *)&buffer[offset];
     *ptr = (uptr)NULL;
 
-    // Then work backwards to the front of the list.
+    /* Then work backwards to the front of the list. */
     while (offset) 
     {
         size next_offset = offset;
@@ -446,7 +444,7 @@ mag_static_pool_reset(MagStaticPool *pool)
 {
     Assert(pool && pool->buffer && pool->num_objects && pool->object_size);
 
-    // Initialize the free list to a linked list.
+    /* Initialize the free list to a linked list. */
     mag_static_pool_initialize_linked_list(pool->buffer, pool->object_size, pool->num_objects);
     pool->free = &pool->buffer[0];
 }
@@ -454,8 +452,8 @@ mag_static_pool_reset(MagStaticPool *pool)
 static inline MagStaticPool
 mag_static_pool_create(size object_size, size num_objects, byte buffer[])
 {
-    Assert(object_size >= sizeof(void *));       // Need to be able to fit at least a pointer!
-    Assert(object_size % _Alignof(void *) == 0); // Need for alignment of pointers.
+    Assert(object_size >= sizeof(void *));       /* Need to be able to fit at least a pointer! */
+    Assert(object_size % _Alignof(void *) == 0); /* Need for alignment of pointers.            */
     Assert(num_objects > 0);
 
     MagStaticPool pool = { .buffer = buffer, .object_size = object_size, .num_objects = num_objects };
@@ -551,12 +549,12 @@ mag_dyn_arena_block_alloc(MagDynArenaBlock *block, size num_bytes, size alignmen
 {
     Assert(num_bytes > 0 && alignment > 0);
 
-    // Align 'curr_offset' forward to the specified alignment
+    /* Align 'curr_offset' forward to the specified alignment */
     uptr curr_ptr = (uptr)block->buffer + (uptr)block->buf_offset;
     uptr offset = mag_align_pointer(curr_ptr, alignment);
-    offset -= (uptr)block->buffer; // change to relative offset
+    offset -= (uptr)block->buffer; /* change to relative offset */
 
-    // Check to see if there is enough space left
+    /* Check to see if there is enough space left */
     if ((size)(offset + num_bytes) <= block->buf_size)
     {
         void *ptr = &block->buffer[offset];
@@ -749,10 +747,10 @@ mag_dyn_arena_realloc(MagDynArena *arena, void *ptr, size num_bytes)
 
     if(ptr == arena->prev_ptr)
     {
-        // Get previous extra offset due to alignment
-        uptr offset = (uptr)ptr - (uptr)arena->prev_block->buffer; // relative offset accounting for alignment
+        /* Get previous extra offset due to alignment */
+        uptr offset = (uptr)ptr - (uptr)arena->prev_block->buffer; /* relative offset accounting for alignment */
 
-        // Check to see if there is enough space left
+        /* Check to see if there is enough space left */
         if ((size)(offset + num_bytes) <= arena->prev_block->buf_size)
         {
             arena->prev_block->buf_offset = offset + num_bytes;
@@ -863,9 +861,9 @@ mag_str_alloc_copy_static(ElkStr src, MagStaticArena *arena)
 {
     ElkStr ret_val = {0};
 
-    size copy_len = src.len + 1; // Add room for terminating zero.
+    size copy_len = src.len + 1; /* Add room for terminating zero. */
     char *buffer = mag_static_arena_nmalloc(arena, copy_len, char);
-    StopIf(!buffer, return ret_val); // Return NULL string if out of memory
+    StopIf(!buffer, return ret_val); /* Return NULL string if out of memory */
 
     ret_val = elk_str_copy(copy_len, buffer, src);
 
@@ -938,9 +936,9 @@ mag_str_alloc_copy_dyn(ElkStr src, MagDynArena *arena)
 {
     ElkStr ret_val = {0};
 
-    size copy_len = src.len + 1; // Add room for terminating zero.
+    size copy_len = src.len + 1; /* Add room for terminating zero. */
     char *buffer = mag_dyn_arena_nmalloc(arena, copy_len, char);
-    StopIf(!buffer, return ret_val); // Return NULL string if out of memory
+    StopIf(!buffer, return ret_val); /* Return NULL string if out of memory */
 
     ret_val = elk_str_copy(copy_len, buffer, src);
 
@@ -992,9 +990,9 @@ mag_str_alloc_copy_alloc(ElkStr src, MagAllocator *alloc)
 {
     ElkStr ret_val = {0};
 
-    size copy_len = src.len + 1; // Add room for terminating zero.
+    size copy_len = src.len + 1; /* Add room for terminating zero. */
     char *buffer = mag_allocator_nmalloc(alloc, copy_len, char);
-    StopIf(!buffer, return ret_val); // Return NULL string if out of memory
+    StopIf(!buffer, return ret_val); /* Return NULL string if out of memory. */
 
     ret_val = elk_str_copy(copy_len, buffer, src);
 
