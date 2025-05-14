@@ -11,7 +11,8 @@
 /*---------------------------------------------------------------------------------------------------------------------------
  * TODO: Things I'd like to add.
  *-------------------------------------------------------------------------------------------------------------------------*/
-
+/* TODO: Add ownership flag to the MemoryBlock.                                           */
+/* TODO: Create a memory block from a buffer, perhaps on the stack. (Probably not owned.) */
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                         Memory
@@ -21,13 +22,18 @@
  */
 typedef struct
 {
-    void *mem;
+    byte *mem;
     size size;
-    b32 valid;
+    u8 flags; /* bit field, 0x1 = valid, 0x2 = is owned */
 } MagMemoryBlock;
 
 static inline MagMemoryBlock mag_sys_memory_allocate(size minimum_num_bytes);
 static inline void mag_sys_memory_free(MagMemoryBlock *mem);
+static inline MagMemoryBlock mag_wrap_memory(size buf_size, void *buffer);
+
+#define MAG_MEM_IS_VALID(mem_block) (((mem_block).flags & 0x01u) > 0)
+#define MAG_MEM_IS_OWNED(mem_block) (((mem_block).flags & 0x02u) > 0)
+#define MAG_MEM_IS_VALID_AND_OWNED(mem_block) (((mem_block).flags & (0x01u | 0x02u)) == 0x03u)
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                 Static Arena Allocator
@@ -48,9 +54,8 @@ typedef struct
 
 typedef struct 
 {
-    size buf_size;
+    MagMemoryBlock buf;
     size buf_offset;
-    byte *buffer;
     void *prev_ptr;
     size prev_offset;
 #ifdef _MAG_TRACK_MEM_USAGE
@@ -59,6 +64,7 @@ typedef struct
 } MagStaticArena;
 
 static inline MagStaticArena mag_static_arena_create(size buf_size, byte buffer[]);
+static inline MagStaticArena mag_static_arena_allocate_and_create(size num_bytes);
 static inline void mag_static_arena_destroy(MagStaticArena *arena);
 static inline void mag_static_arena_reset(MagStaticArena *arena);                                  /* Set offset to 0, invalidates all previous allocations */
 static inline void *mag_static_arena_alloc(MagStaticArena *arena, size num_bytes, size alignment); /* ret NULL if out of memory (OOM)                       */
@@ -76,12 +82,6 @@ static size mag_static_arena_metrics_next = 0;
 static inline f64 mag_static_arena_max_ratio(MagStaticArena *arena);
 static inline b32 mag_static_arena_over_allocated(MagStaticArena *arena);
 #endif
-
-/*
- * Allocate some memory from the heap and manage it with an MagStaticArena.
- */
-static inline MagStaticArena mag_static_arena_allocate_and_create(size num_bytes);
-static inline void mag_static_arena_destroy_and_deallocate(MagStaticArena *arena);
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                  Static Pool Allocator
@@ -105,7 +105,7 @@ typedef struct
     size object_size;    /* The size of each object                                 */
     size num_objects;    /* The capacity, or number of objects storable in the pool */
     void *free;          /* The head of a free list of available slots for objects  */
-    byte *buffer;        /* The buffer we actually store the data in                */
+    MagMemoryBlock buf;  /* The buffer we actually store the data in                */
 } MagStaticPool;
 
 static inline MagStaticPool mag_static_pool_create(size object_size, size num_objects, byte buffer[]);
@@ -286,12 +286,16 @@ mag_align_pointer(uptr ptr, usize align)
     return ptr;
 }
 
-static inline MagStaticArena
-mag_static_arena_create(size buf_size, byte buffer[])
+static inline MagMemoryBlock 
+mag_wrap_memory(size buf_size, void *buffer)
 {
-    Assert(buffer && buf_size > 0);
+    return (MagMemoryBlock){ .mem = buffer, .size = buf_size, .flags = 0x01u | 0x00u };
+}
 
-    MagStaticArena arena = { .buf_size = buf_size, .buf_offset = 0, .buffer = buffer, .prev_ptr = NULL, .prev_offset = 0, };
+static inline MagStaticArena
+mag_static_arena_create_internal(MagMemoryBlock mem)
+{
+    MagStaticArena arena = { .buf = mem, .buf_offset = 0, .prev_ptr = NULL, .prev_offset = 0, };
 
 #ifdef _MAG_TRACK_MEM_USAGE
     size idx = mag_static_arena_metrics_next++;
@@ -299,6 +303,30 @@ mag_static_arena_create(size buf_size, byte buffer[])
     arena.metrics_ptr = &mag_static_arena_metrics[idx];
     *arena.metrics_ptr = (MagStaticArenaAllocationMetrics){0};
 #endif
+
+    return arena;
+}
+
+static inline MagStaticArena
+mag_static_arena_create(size buf_size, byte buffer[])
+{
+    Assert(buffer && buf_size > 0);
+    MagMemoryBlock mblk = mag_wrap_memory(buf_size, buffer);
+    return mag_static_arena_create_internal(mblk);
+}
+
+static inline MagStaticArena 
+mag_static_arena_allocate_and_create(size num_bytes)
+{
+    Assert(num_bytes > 0);
+
+    MagMemoryBlock mem = mag_sys_memory_allocate(num_bytes);
+    MagStaticArena arena = {0};
+
+    if(MAG_MEM_IS_VALID(mem))
+    {
+        arena = mag_static_arena_create_internal(mem);
+    }
 
     return arena;
 }
@@ -313,7 +341,7 @@ mag_static_arena_destroy(MagStaticArena *arena)
 static inline void
 mag_static_arena_reset(MagStaticArena *arena)
 {
-    Assert(arena->buffer);
+    Assert(arena->buf.mem);
     arena->buf_offset = 0;
     arena->prev_ptr = NULL;
     arena->prev_offset = 0;
@@ -326,14 +354,14 @@ mag_static_arena_alloc(MagStaticArena *arena, size num_bytes, size alignment)
     Assert(num_bytes > 0 && alignment > 0);
 
     /* Align 'curr_offset' forward to the specified alignment */
-    uptr curr_ptr = (uptr)arena->buffer + (uptr)arena->buf_offset;
+    uptr curr_ptr = (uptr)arena->buf.mem + (uptr)arena->buf_offset;
     uptr offset = mag_align_pointer(curr_ptr, alignment);
-    offset -= (uptr)arena->buffer; /* change to relative offset */
+    offset -= (uptr)arena->buf.mem; /* change to relative offset */
 
     /* Check to see if there is enough space left */
-    if ((size)(offset + num_bytes) <= arena->buf_size)
+    if ((size)(offset + num_bytes) <= arena->buf.size)
     {
-        void *ptr = &arena->buffer[offset];
+        void *ptr = &arena->buf.mem[offset];
         memset(ptr, 0, num_bytes);
         arena->prev_offset = arena->buf_offset;
         arena->buf_offset = offset + num_bytes;
@@ -363,10 +391,10 @@ mag_static_arena_realloc(MagStaticArena *arena, void *ptr, size asize)
     if(ptr == arena->prev_ptr)
     {
         /* Get previous extra offset due to alignment */
-        uptr offset = (uptr)ptr - (uptr)arena->buffer; /* relative offset accounting for alignment */
+        uptr offset = (uptr)ptr - (uptr)arena->buf.mem; /* relative offset accounting for alignment */
 
         /* Check to see if there is enough space left */
-        if ((size)(offset + asize) <= arena->buf_size)
+        if ((size)(offset + asize) <= arena->buf.size)
         {
             arena->buf_offset = offset + asize;
 
@@ -404,7 +432,7 @@ mag_static_arena_free(MagStaticArena *arena, void *ptr)
 static inline f64 
 mag_static_arena_max_ratio(MagStaticArena *arena)
 {
-    return (f64)arena->metrics_ptr->max_offset / (f64)arena->buf_size;
+    return (f64)arena->metrics_ptr->max_offset / (f64)arena->buf.size;
 }
 
 static inline b32 
@@ -442,11 +470,11 @@ mag_static_pool_initialize_linked_list(byte *buffer, size object_size, size num_
 static inline void
 mag_static_pool_reset(MagStaticPool *pool)
 {
-    Assert(pool && pool->buffer && pool->num_objects && pool->object_size);
+    Assert(pool && pool->buf.mem && pool->num_objects && pool->object_size);
 
     /* Initialize the free list to a linked list. */
-    mag_static_pool_initialize_linked_list(pool->buffer, pool->object_size, pool->num_objects);
-    pool->free = &pool->buffer[0];
+    mag_static_pool_initialize_linked_list(pool->buf.mem, pool->object_size, pool->num_objects);
+    pool->free = &pool->buf.mem[0];
 }
 
 static inline MagStaticPool
@@ -456,7 +484,8 @@ mag_static_pool_create(size object_size, size num_objects, byte buffer[])
     Assert(object_size % _Alignof(void *) == 0); /* Need for alignment of pointers.            */
     Assert(num_objects > 0);
 
-    MagStaticPool pool = { .buffer = buffer, .object_size = object_size, .num_objects = num_objects };
+    MagMemoryBlock mblk = mag_wrap_memory(num_objects * object_size, buffer);
+    MagStaticPool pool = { .buf = mblk, .object_size = object_size, .num_objects = num_objects };
 
     mag_static_pool_reset(&pool);
 
@@ -466,6 +495,7 @@ mag_static_pool_create(size object_size, size num_objects, byte buffer[])
 static inline void
 mag_static_pool_destroy(MagStaticPool *pool)
 {
+    mag_sys_memory_free(&pool->buf);
     memset(pool, 0, sizeof(*pool));
 }
 
@@ -492,35 +522,10 @@ mag_static_pool_alloc(MagStaticPool *pool)
     return ptr;
 }
 
-static inline MagStaticArena 
-mag_static_arena_allocate_and_create(size num_bytes)
-{
-    MagStaticArena arena = {0};
-    MagMemoryBlock mem = mag_sys_memory_allocate(num_bytes);
-
-    if(mem.valid)
-    {
-        arena = mag_static_arena_create(mem.size, mem.mem);
-    }
-
-    return arena;
-}
-
-static inline void 
-mag_static_arena_destroy_and_deallocate(MagStaticArena *arena)
-{
-    MagMemoryBlock mem = { .mem = arena->buffer, .size = arena->buf_size, .valid = true };
-    mag_sys_memory_free(&mem);
-    arena->buffer = NULL;
-    arena->buf_size = 0;
-    return;
-}
-
 struct MagDynArenaBlock
 {
-    size buf_size;
+    MagMemoryBlock buf;
     size buf_offset;
-    byte *buffer;
     struct MagDynArenaBlock *next;
 };
 
@@ -528,13 +533,12 @@ static inline MagDynArenaBlock *
 mag_dyn_arena_block_create(size block_size)
 {
     MagMemoryBlock mem = mag_sys_memory_allocate(block_size + sizeof(MagDynArenaBlock));
-    if(mem.valid)
+    if(MAG_MEM_IS_VALID(mem))
     {
         /* Place the block metadata at the beginning of the memory block. */
-        MagDynArenaBlock *block = mem.mem;
-        block->buf_size = mem.size;
+        MagDynArenaBlock *block = (void *)mem.mem;
         block->buf_offset = sizeof(MagDynArenaBlock);
-        block->buffer = mem.mem;
+        block->buf = mem;
         block->next = NULL;
         return block;
     }
@@ -550,14 +554,14 @@ mag_dyn_arena_block_alloc(MagDynArenaBlock *block, size num_bytes, size alignmen
     Assert(num_bytes > 0 && alignment > 0);
 
     /* Align 'curr_offset' forward to the specified alignment */
-    uptr curr_ptr = (uptr)block->buffer + (uptr)block->buf_offset;
+    uptr curr_ptr = (uptr)block->buf.mem + (uptr)block->buf_offset;
     uptr offset = mag_align_pointer(curr_ptr, alignment);
-    offset -= (uptr)block->buffer; /* change to relative offset */
+    offset -= (uptr)block->buf.mem; /* change to relative offset */
 
     /* Check to see if there is enough space left */
-    if ((size)(offset + num_bytes) <= block->buf_size)
+    if ((size)(offset + num_bytes) <= block->buf.size)
     {
-        void *ptr = &block->buffer[offset];
+        void *ptr = &block->buf.mem[offset];
         memset(ptr, 0, num_bytes);
         *prev_offset = block->buf_offset;
         block->buf_offset = offset + num_bytes;
@@ -581,7 +585,7 @@ mag_dyn_arena_create(size default_block_size)
 
     arena.head_block = block;
     arena.num_blocks = 1;
-    arena.num_total_bytes = block->buf_size;
+    arena.num_total_bytes = block->buf.size;
     arena.default_block_size = default_block_size;
 
     arena.prev_block = block;
@@ -598,8 +602,7 @@ static inline void mag_dyn_arena_destroy(MagDynArena *arena)
     while(curr)
     {
         MagDynArenaBlock *next = curr->next;
-        MagMemoryBlock mem = { .mem = curr, .size = curr->buf_size, .valid = true} ;
-        mag_sys_memory_free(&mem);
+        mag_sys_memory_free(&curr->buf);
         curr = next;
     }
 
@@ -636,8 +639,7 @@ mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
     while(curr)
     {
         MagDynArenaBlock *next = curr->next;
-        MagMemoryBlock mem = { .mem = curr, .size = curr->buf_size, .valid = true} ;
-        mag_sys_memory_free(&mem);
+        mag_sys_memory_free(&curr->buf);
         curr = next;
     }
 
@@ -655,7 +657,7 @@ mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
 
         arena->head_block = block;
         arena->num_blocks = 1;
-        arena->num_total_bytes = block->buf_size;
+        arena->num_total_bytes = block->buf.size;
         /* arena->default_block_size = ...doesn't need changed; */
 
         arena->prev_block = block;
@@ -690,7 +692,7 @@ mag_dyn_arena_add_block(MagDynArena *arena, size min_bytes)
         curr->next = block;
 
         arena->num_blocks += 1;
-        arena->num_total_bytes += block->buf_size;
+        arena->num_total_bytes += block->buf.size;
     }
 
     return block;
@@ -748,10 +750,10 @@ mag_dyn_arena_realloc(MagDynArena *arena, void *ptr, size num_bytes)
     if(ptr == arena->prev_ptr)
     {
         /* Get previous extra offset due to alignment */
-        uptr offset = (uptr)ptr - (uptr)arena->prev_block->buffer; /* relative offset accounting for alignment */
+        uptr offset = (uptr)ptr - (uptr)arena->prev_block->buf.mem; /* relative offset accounting for alignment */
 
         /* Check to see if there is enough space left */
-        if ((size)(offset + num_bytes) <= arena->prev_block->buf_size)
+        if ((size)(offset + num_bytes) <= arena->prev_block->buf.size)
         {
             arena->prev_block->buf_offset = offset + num_bytes;
             return ptr;

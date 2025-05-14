@@ -2,8 +2,9 @@
 #define _MAGPIE_LINUX_H_
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                  Linux Implementation
- *-------------------------------------------------------------------------------------------------------------------------*/
-// Linux specific implementation goes here - things NOT in common with Apple / BSD
+ *---------------------------------------------------------------------------------------------------------------------------
+ * Linux specific implementation goes here - things NOT in common with Apple / BSD
+ */
 #include <fcntl.h>
 #include <linux/perf_event.h>
 #include <sys/ioctl.h>
@@ -27,26 +28,30 @@ mag_sys_memory_allocate(size minimum_num_bytes)
     StopIf(page_size == -1, goto ERR_RETURN);
     usize nbytes = minimum_num_bytes + page_size - (minimum_num_bytes % page_size);
 
-    void *ptr = mmap(NULL,                                    // the starting address, NULL = don't care
-                     nbytes,                                  // the amount of memory to allocate
-                     PROT_READ | PROT_WRITE,                  // we should have read and write access to the memory
-                     MAP_PRIVATE | MAP_ANON | MAP_POPULATE,   // not backed by a file, this is pure memory
-                     -1,                                      // recommended file descriptor for portability
-                     0);                                      // offset into what? this isn't a file, so should be zero
+    void *ptr = mmap(NULL,                                    /* the starting address, NULL = don't care                */
+                     nbytes,                                  /* the amount of memory to allocate                       */
+                     PROT_READ | PROT_WRITE,                  /* we should have read and write access to the memory     */
+                     MAP_PRIVATE | MAP_ANON | MAP_POPULATE,   /* not backed by a file, this is pure memory              */
+                     -1,                                      /* recommended file descriptor for portability            */
+                     0);                                      /* offset into what? this isn't a file, so should be zero */
 
     StopIf(ptr == MAP_FAILED, goto ERR_RETURN);
 
-    return (MagMemoryBlock){ .mem = ptr, .size = nbytes, .valid = true };
+    return (MagMemoryBlock){ .mem = ptr, .size = nbytes, .flags = 0x01u | 0x02u };
 
 ERR_RETURN:
-    return (MagMemoryBlock){ .mem = NULL, .size = 0, .valid = false};
+    return (MagMemoryBlock){ 0 };
 }
 
 static inline void
 mag_sys_memory_free(MagMemoryBlock *mem)
 {
-    /* int success = */ munmap(mem->mem, (size_t)mem->size);
-    memset(mem, 0, sizeof(*mem));
+    if(MAG_MEM_IS_VALID_AND_OWNED(*mem))
+    {
+        /* int success = */ munmap(mem->mem, (size_t)mem->size);
+        memset(mem, 0, sizeof(*mem));
+    }
+
     return;
 }
 
