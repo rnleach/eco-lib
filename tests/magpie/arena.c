@@ -138,7 +138,7 @@ test_static_arena_realloc(void)
         Assert(hundred_dubs[i] == (f64)i);
     }
 
-    f64 *million_dubs = mag_static_arena_realloc(borrowed, hundred_dubs, 1000000 * sizeof *ten_dubs);
+    f64 *million_dubs = mag_static_arena_nrealloc(borrowed, hundred_dubs, 1000000, f64);
     Assert(!million_dubs);
 
 
