@@ -43,8 +43,10 @@ mag_sys_memory_free(MagMemoryBlock *mem)
 {
     if(MAG_MEM_IS_VALID_AND_OWNED(*mem))
     {
-         /*BOOL success =*/ VirtualFree(mem->mem, 0, MEM_RELEASE);
+        /* Copy them out in case the MagMemoryBlock is stored in memory it allocated! It happens. */
+        void *smem = mem->mem;
          memset(mem, 0, sizeof(*mem));
+         /*BOOL success =*/ VirtualFree(smem, 0, MEM_RELEASE);
     }
 
     return;

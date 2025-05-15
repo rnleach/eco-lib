@@ -43,8 +43,11 @@ mag_sys_memory_free(MagMemoryBlock *mem)
 {
     if(MAG_MEM_IS_VALID_AND_OWNED(*mem))
     {
-        /* int success = */ munmap(mem->mem, (size_t)mem->size);
+        /* Copy them out in case the MagMemoryBlock is stored in memory it allocated! It happens. */
+        void *smem = mem->mem;
+        size_t sz = mem->size;
         memset(mem, 0, sizeof(*mem));
+        /* int success = */ munmap(smem, sz);
     }
 
     return;
