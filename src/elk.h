@@ -1022,31 +1022,46 @@ elk_str_robust_parse_f64(ElkStr str, f64 *out)
     }
 
     // Parse the mantissa up to the decimal point or exponent part
-    char digit = *c - '0';
-    while (c < end && digit  < 10 && digit  >= 0)
+    char digit;
+    while (c < end)
     {
-        mantissa = mantissa * 10 + digit;
-        ++c;
         digit = *c - '0';
+
+        if(digit < 10 && digit >= 0)
+        {
+            mantissa = mantissa * 10 + digit;
+            ++c;
+        }
+        else
+        {
+            break;
+        }
     }
 
     // Check for the decimal point
-    if (c < end && *c == '.')
+    if(c < end && *c == '.')
     {
         ++c;
 
         // Parse the mantissa up to the decimal point or exponent part
-        digit = *c - '0';
-        while (c < end && digit < 10 && digit >= 0)
+        while(c < end)
         {
-            // overflow check
-            StopIf((INT64_MAX - digit) / 10 < mantissa, goto ERR_RETURN); 
-
-            mantissa = mantissa * 10 + digit;
-            extra_exp += 1;
-
-            ++c;
             digit = *c - '0';
+
+            if(digit < 10 && digit >= 0)
+            {
+                // overflow check
+                StopIf((INT64_MAX - digit) / 10 < mantissa, goto ERR_RETURN); 
+
+                mantissa = mantissa * 10 + digit;
+                extra_exp += 1;
+
+                ++c;
+            }
+            else
+            {
+                break;
+            }
         }
     }
 
@@ -1054,7 +1069,7 @@ elk_str_robust_parse_f64(ElkStr str, f64 *out)
     mantissa = sign == 1 ? -mantissa : mantissa;
 
     // Start the exponent
-    if (c < end && (*c == 'e' || *c == 'E')) 
+    if(c < end && (*c == 'e' || *c == 'E')) 
     {
         ++c;
 
@@ -1062,16 +1077,23 @@ elk_str_robust_parse_f64(ElkStr str, f64 *out)
         else if (*c == '+') { exp_sign = 0; ++c; }
 
         // Parse the mantissa up to the decimal point or exponent part
-        digit = *c - '0';
-        while (c < end && digit < 10 && digit >= 0)
+        while(c < end)
         {
-            // Overflow check
-            StopIf((INT16_MAX - digit) / 10 < exponent, goto ERR_RETURN); 
-
-            exponent = exponent * 10 + digit;
-
-            ++c;
             digit = *c - '0';
+
+            if(digit < 10 && digit >= 0)
+            {
+                // Overflow check
+                StopIf((INT16_MAX - digit) / 10 < exponent, goto ERR_RETURN); 
+
+                exponent = exponent * 10 + digit;
+
+                ++c;
+            }
+            else
+            {
+                break;
+            }
         }
 
         // Account for negative signs
