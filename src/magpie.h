@@ -9,12 +9,6 @@
 #pragma warning(push)
 
 /*---------------------------------------------------------------------------------------------------------------------------
- * TODO: Things I'd like to add.
- *-------------------------------------------------------------------------------------------------------------------------*/
-/* TODO: Add ownership flag to the MemoryBlock.                                           */
-/* TODO: Create a memory block from a buffer, perhaps on the stack. (Probably not owned.) */
-
-/*---------------------------------------------------------------------------------------------------------------------------
  *                                                         Memory
  *---------------------------------------------------------------------------------------------------------------------------
  * Request big chunks of memory from the OS, bypassing the CRT. The system may round up your requested memory size, but it
@@ -44,14 +38,6 @@ static inline MagMemoryBlock mag_wrap_memory(size buf_size, void *buffer);
  * A statically sized, non-growable arena allocator that works on top of a user supplied buffer.
  */
 
-#ifdef _MAG_TRACK_MEM_USAGE
-typedef struct
-{
-    size max_offset;
-    b32 over_allocation_attempted;
-} MagStaticArenaAllocationMetrics;
-#endif
-
 typedef struct 
 {
     MagMemoryBlock buf;
@@ -59,12 +45,26 @@ typedef struct
     void *prev_ptr;
     size prev_offset;
 #ifdef _MAG_TRACK_MEM_USAGE
-    MagStaticArenaAllocationMetrics *metrics_ptr;
+    b32 is_borrowed;
+    union
+    {
+        struct
+        {
+            size max_offset;
+            b32 failed_allocation;
+        };
+        struct
+        {
+            size *max_offset_ptr;
+            b32 *failed_allocation_ptr;
+        };
+    };
 #endif
 } MagStaticArena;
 
 static inline MagStaticArena mag_static_arena_create(size buf_size, byte buffer[]);
 static inline MagStaticArena mag_static_arena_allocate_and_create(size num_bytes);
+static inline MagStaticArena mag_static_arena_borrow(MagStaticArena *arena);                       /* Creates a borrowed version where all new allocations can eventually be overwritten by the original. */
 static inline void mag_static_arena_destroy(MagStaticArena *arena);
 static inline void mag_static_arena_reset(MagStaticArena *arena);                                  /* Set offset to 0, invalidates all previous allocations */
 static inline void *mag_static_arena_alloc(MagStaticArena *arena, size num_bytes, size alignment); /* ret NULL if out of memory (OOM)                       */
@@ -77,8 +77,6 @@ static inline void mag_static_arena_free(MagStaticArena *arena, void *ptr);     
 #define mag_static_arena_nrealloc(arena, ptr, count, type) (type *) mag_static_arena_realloc((arena), (ptr), sizeof(type) * (count))
 
 #ifdef _MAG_TRACK_MEM_USAGE
-static MagStaticArenaAllocationMetrics mag_static_arena_metrics[128] = {0};
-static size mag_static_arena_metrics_next = 0;
 static inline f64 mag_static_arena_max_ratio(MagStaticArena *arena);
 static inline b32 mag_static_arena_over_allocated(MagStaticArena *arena);
 #endif
@@ -298,10 +296,9 @@ mag_static_arena_create_internal(MagMemoryBlock mem)
     MagStaticArena arena = { .buf = mem, .buf_offset = 0, .prev_ptr = NULL, .prev_offset = 0, };
 
 #ifdef _MAG_TRACK_MEM_USAGE
-    size idx = mag_static_arena_metrics_next++;
-    Assert(idx < (sizeof(mag_static_arena_metrics) / sizeof(mag_static_arena_metrics[0])));
-    arena.metrics_ptr = &mag_static_arena_metrics[idx];
-    *arena.metrics_ptr = (MagStaticArenaAllocationMetrics){0};
+    arena.is_borrowed = false;
+    arena.max_offset = 0;
+    arena.failed_allocation = false;
 #endif
 
     return arena;
@@ -331,9 +328,27 @@ mag_static_arena_allocate_and_create(size num_bytes)
     return arena;
 }
 
+static inline MagStaticArena
+mag_static_arena_borrow(MagStaticArena *arena)
+{
+    MagStaticArena borrowed = *arena;
+#ifdef _MAG_TRACK_MEM_USAGE
+    if(!borrowed.is_borrowed)
+    {
+        borrowed.is_borrowed = true;
+        borrowed.max_offset_ptr = &arena->max_offset;
+        borrowed.failed_allocation_ptr = &arena->failed_allocation;
+    }
+#endif
+    return borrowed;
+}
+
 static inline void
 mag_static_arena_destroy(MagStaticArena *arena)
 {
+#ifdef _MAG_TRACK_MEM_USAGE
+    Assert(!arena->is_borrowed);
+#endif
     *arena = (MagStaticArena){0};
     return;
 }
@@ -368,8 +383,14 @@ mag_static_arena_alloc(MagStaticArena *arena, size num_bytes, size alignment)
         arena->prev_ptr = ptr;
 
 #ifdef _MAG_TRACK_MEM_USAGE
-        arena->metrics_ptr->max_offset = arena->buf_offset > (arena->metrics_ptr->max_offset) ?
-            arena->buf_offset : (arena->metrics_ptr->max_offset);
+        if(arena->is_borrowed && *arena->max_offset_ptr < arena->buf_offset)
+        {
+             *arena->max_offset_ptr = arena->buf_offset; 
+        }
+        else if(arena->max_offset < arena->buf_offset)
+        {
+             arena->max_offset = arena->buf_offset; 
+        }
 #endif
 
         return ptr;
@@ -377,7 +398,8 @@ mag_static_arena_alloc(MagStaticArena *arena, size num_bytes, size alignment)
     else
     {
 #ifdef _MAG_TRACK_MEM_USAGE
-        arena->metrics_ptr->over_allocation_attempted = true;
+        if(arena->is_borrowed) { *arena->failed_allocation_ptr = true; }
+        else                   {  arena->failed_allocation    = true; }
 #endif
         return NULL;
     }
@@ -399,8 +421,14 @@ mag_static_arena_realloc(MagStaticArena *arena, void *ptr, size asize)
             arena->buf_offset = offset + asize;
 
 #ifdef _MAG_TRACK_MEM_USAGE
-            arena->metrics_ptr->max_offset = arena->buf_offset > (arena->metrics_ptr->max_offset) ?
-                arena->buf_offset : (arena->metrics_ptr->max_offset);
+            if(arena->is_borrowed && *arena->max_offset_ptr < arena->buf_offset)
+            {
+                 *arena->max_offset_ptr = arena->buf_offset; 
+            }
+            else if(arena->max_offset < arena->buf_offset)
+            {
+                 arena->max_offset = arena->buf_offset; 
+            }
 #endif
 
             return ptr;
@@ -408,7 +436,8 @@ mag_static_arena_realloc(MagStaticArena *arena, void *ptr, size asize)
         else
         {
 #ifdef _MAG_TRACK_MEM_USAGE
-            arena->metrics_ptr->over_allocation_attempted = true;
+        if(arena->is_borrowed) { *arena->failed_allocation_ptr = true; }
+        else                   {  arena->failed_allocation    = true; }
 #endif
         }
     }
@@ -432,13 +461,15 @@ mag_static_arena_free(MagStaticArena *arena, void *ptr)
 static inline f64 
 mag_static_arena_max_ratio(MagStaticArena *arena)
 {
-    return (f64)arena->metrics_ptr->max_offset / (f64)arena->buf.size;
+    Assert(!arena->is_borrowed);
+    return (f64)arena->max_offset / (f64)arena->buf.size;
 }
 
 static inline b32 
 mag_static_arena_over_allocated(MagStaticArena *arena)
 {
-    return arena->metrics_ptr->over_allocation_attempted;
+    Assert(!arena->is_borrowed);
+    return arena->failed_allocation;
 }
 
 #endif

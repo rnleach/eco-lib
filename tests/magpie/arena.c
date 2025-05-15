@@ -107,7 +107,10 @@ test_static_arena_realloc(void)
     MagStaticArena arena_instance = mag_static_arena_create(sizeof(buffer), buffer);
     MagStaticArena *arena = &arena_instance;
 
-    f64 *ten_dubs = mag_static_arena_nmalloc(arena, 10, f64);
+    MagStaticArena borrowed_instance = mag_static_arena_borrow(arena);
+    MagStaticArena *borrowed = &borrowed_instance;
+
+    f64 *ten_dubs = mag_static_arena_nmalloc(borrowed, 10, f64);
     Assert(ten_dubs);
 
     for(i32 i = 0; i < 10; ++i)
@@ -115,7 +118,7 @@ test_static_arena_realloc(void)
         ten_dubs[i] = (f64)i;
     }
 
-    f64 *hundred_dubs = mag_static_arena_nrealloc(arena, ten_dubs, 100, f64);
+    f64 *hundred_dubs = mag_static_arena_nrealloc(borrowed, ten_dubs, 100, f64);
 
     Assert(hundred_dubs);
     Assert(hundred_dubs == ten_dubs);
@@ -135,7 +138,7 @@ test_static_arena_realloc(void)
         Assert(hundred_dubs[i] == (f64)i);
     }
 
-    f64 *million_dubs = mag_static_arena_realloc(arena, hundred_dubs, 1000000 * sizeof *ten_dubs);
+    f64 *million_dubs = mag_static_arena_realloc(borrowed, hundred_dubs, 1000000 * sizeof *ten_dubs);
     Assert(!million_dubs);
 
 
