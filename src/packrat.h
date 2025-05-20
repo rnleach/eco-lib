@@ -15,7 +15,7 @@
  * NOTE: The interner copies any successfully interned string, so once it has been interned you can reclaim the memory that 
  * was holding it before.
  */
-typedef struct // Internal only
+typedef struct /* Internal only */
 {
     u64 hash;
     ElkStr str;
@@ -105,9 +105,9 @@ typedef struct
 static inline PakQueueLedger pak_queue_ledger_create(size capacity);
 static inline b32 pak_queue_ledger_full(PakQueueLedger *queue);
 static inline b32 pak_queue_ledger_empty(PakQueueLedger *queue);
-static inline size pak_queue_ledger_push_back_index(PakQueueLedger *queue);  // index of next location to put an object
-static inline size pak_queue_ledger_pop_front_index(PakQueueLedger *queue);  // index of next location to take object
-static inline size pak_queue_ledger_peek_front_index(PakQueueLedger *queue); // index of next object, but not incremented
+static inline size pak_queue_ledger_push_back_index(PakQueueLedger *queue);  /* index of next location to put an object   */
+static inline size pak_queue_ledger_pop_front_index(PakQueueLedger *queue);  /* index of next location to take object     */
+static inline size pak_queue_ledger_peek_front_index(PakQueueLedger *queue); /* index of next object, but not incremented */
 static inline size pak_queue_ledger_len(PakQueueLedger const *queue);
 
 /*---------------------------------------------------------------------------------------------------------------------------
@@ -146,7 +146,7 @@ static inline void pak_array_ledger_set_capacity(PakArrayLedger *array, size cap
  * The ELkHashMap does NOT copy any objects, so it only stores pointers. The user has to manage the memory for their own
  * objects.
  */
-typedef struct // Internal Only
+typedef struct /* Internal Only */
 {
     u64 hash;
     void *key;
@@ -167,8 +167,8 @@ typedef size PakHashMapKeyIter;
 
 static inline PakHashMap pak_hash_map_create(i8 size_exp, ElkSimpleHash key_hash, ElkEqFunction key_eq, MagAllocator *alloc);
 static inline void pak_hash_map_destroy(PakHashMap *map);
-static inline void *pak_hash_map_insert(PakHashMap *map, void *key, void *value); // if return != value, key was already in the map
-static inline void *pak_hash_map_lookup(PakHashMap *map, void *key); // return NULL if not in map, otherwise return pointer to value
+static inline void *pak_hash_map_insert(PakHashMap *map, void *key, void *value); /* if return != value, key was already in the map  */
+static inline void *pak_hash_map_lookup(PakHashMap *map, void *key); /* return NULL if not in map, otherwise return pointer to value */
 static inline size pak_hash_map_len(PakHashMap *map);
 static inline PakHashMapKeyIter pak_hash_map_key_iter(PakHashMap *map);
 
@@ -203,9 +203,9 @@ typedef size PakStrMapHandleIter;
 
 static inline PakStrMap pak_str_map_create(i8 size_exp, MagAllocator *alloc);
 static inline void pak_str_map_destroy(PakStrMap *map);
-static inline void *pak_str_map_insert(PakStrMap *map, ElkStr key, void *value); // if return != value, key was already in the map
-static inline void *pak_str_map_lookup(PakStrMap *map, ElkStr key); // return NULL if not in map, otherwise return pointer to value
-static inline PakStrMapHandle const *pak_str_map_lookup_handle(PakStrMap *map, ElkStr key); // return NULL if not in map, otherwise return pointer to handle
+static inline void *pak_str_map_insert(PakStrMap *map, ElkStr key, void *value); /* if return != value, key was already in the map                           */
+static inline void *pak_str_map_lookup(PakStrMap *map, ElkStr key); /* return NULL if not in map, otherwise return pointer to value                          */
+static inline PakStrMapHandle const *pak_str_map_lookup_handle(PakStrMap *map, ElkStr key); /* return NULL if not in map, otherwise return pointer to handle */
 static inline size pak_str_map_len(PakStrMap *map);
 static inline PakStrMapKeyIter pak_str_map_key_iter(PakStrMap *map);
 static inline PakStrMapHandleIter pak_str_map_handle_iter(PakStrMap *map);
@@ -222,7 +222,7 @@ static inline PakStrMapHandle pak_str_map_handle_iter_next(PakStrMap *map, PakSt
  * The ELkHashSet does NOT copy any objects, so it only stores pointers. The user has to manage the memory for their own
  * objects.
  */
-typedef struct // Internal only
+typedef struct /* Internal only */
 {
     u64 hash;
     void *value;
@@ -242,8 +242,8 @@ typedef size PakHashSetIter;
 
 static inline PakHashSet pak_hash_set_create(i8 size_exp, ElkSimpleHash val_hash, ElkEqFunction val_eq, MagAllocator *alloc);
 static inline void pak_hash_set_destroy(PakHashSet *set);
-static inline void *pak_hash_set_insert(PakHashSet *set, void *value); // if return != value, value was already in the set
-static inline void *pak_hash_set_lookup(PakHashSet *set, void *value); // return NULL if not in set, else return ptr to value
+static inline void *pak_hash_set_insert(PakHashSet *set, void *value); /* if return != value, value was already in the set    */
+static inline void *pak_hash_set_lookup(PakHashSet *set, void *value); /* return NULL if not in set, else return ptr to value */
 static inline size pak_hash_set_len(PakHashSet *set);
 static inline PakHashSetIter pak_hash_set_value_iter(PakHashSet *set);
 
@@ -321,7 +321,7 @@ static inline void pak_radix_sort(
 static inline PakStringInterner 
 pak_string_interner_create(i8 size_exp, MagAllocator *storage)
 {
-    Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
+    Assert(size_exp > 0 && size_exp <= 31); /* Come on, 2^31 is HUGE */
 
     usize const handles_len = (usize)(1 << size_exp);
     PakStringInternerHandle *handles = eco_nmalloc(storage, handles_len, PakStringInternerHandle);
@@ -345,17 +345,18 @@ pak_string_interner_destroy(PakStringInterner *interner)
 static inline b32
 pak_hash_table_large_enough(usize num_handles, i8 size_exp)
 {
-    // Shoot for no more than 75% of slots filled.
+    /* Shoot for no more than 75% of slots filled. */
     return num_handles < 3 * (1 << size_exp) / 4;
 }
 
 static inline u32
 pak_hash_lookup(u64 hash, i8 exp, u32 idx)
 {
-    // Copied from https://nullprogram.com/blog/2022/08/08
-    // All code & writing on this blog is in the public domain.
+    /* Copied from https://nullprogram.com/blog/2022/08/08
+     * All code & writing on this blog is in the public domain.
+     */
     u32 mask = (UINT32_C(1) << exp) - 1;
-    u32 step = (u32)((hash >> (64 - exp)) | 1);    // the | 1 forces an odd number
+    u32 step = (u32)((hash >> (64 - exp)) | 1);    /* the | 1 forces an odd number */
     return (idx + step) & mask;
 }
 
@@ -375,11 +376,11 @@ pak_string_interner_expand_table(PakStringInterner *interner)
     {
         PakStringInternerHandle *handle = &interner->handles[i];
 
-        if (handle->str.start == NULL) { continue; } // Skip if it's empty
+        if (handle->str.start == NULL) { continue; } /* Skip if it's empty */
 
-        // Find the position in the new table and update it.
+        /* Find the position in the new table and update it. */
         u64 const hash = handle->hash;
-        u32 j = hash & 0xffffffff; // truncate
+        u32 j = hash & 0xffffffff; /* truncate */
         while (true) 
         {
             j = pak_hash_lookup(hash, new_size_exp, j);
@@ -387,9 +388,10 @@ pak_string_interner_expand_table(PakStringInterner *interner)
 
             if (!new_handle->str.start)
             {
-                // empty - put it here. Don't need to check for room because we just expanded
-                // the hash table of handles, and we're not copying anything new into storage,
-                // it's already there!
+                /* empty - put it here. Don't need to check for room because we just expanded
+                 * the hash table of handles, and we're not copying anything new into storage,
+                 * it's already there!
+                 */
                 *new_handle = *handle;
                 break;
             }
@@ -412,11 +414,12 @@ pak_string_interner_intern_cstring(PakStringInterner *interner, char *string)
 static inline ElkStr
 pak_string_interner_intern(PakStringInterner *interner, ElkStr str)
 {
-    // Inspired by https://nullprogram.com/blog/2022/08/08
-    // All code & writing on this blog is in the public domain.
+    /* Inspired by https://nullprogram.com/blog/2022/08/08
+     * All code & writing on this blog is in the public domain.
+     */
 
     u64 const hash = elk_fnv1a_hash_str(str);
-    u32 i = hash & 0xffffffff; // truncate
+    u32 i = hash & 0xffffffff; /* truncate */
     while (true)
     {
         i = pak_hash_lookup(hash, interner->size_exp, i);
@@ -424,7 +427,7 @@ pak_string_interner_intern(PakStringInterner *interner, ElkStr str)
 
         if (!handle->str.start)
         {
-            // empty, insert here if room in the table of handles. Check for room first!
+            /* empty, insert here if room in the table of handles. Check for room first! */
             if (pak_hash_table_large_enough(interner->num_handles, interner->size_exp))
             {
                 char *dest = eco_nmalloc(interner->storage, str.len + 1, char);
@@ -438,17 +441,18 @@ pak_string_interner_intern(PakStringInterner *interner, ElkStr str)
             }
             else 
             {
-                // Grow the table so we have room
+                /* Grow the table so we have room */
                 pak_string_interner_expand_table(interner);
 
-                // Recurse because all the state needed by the *_lookup function was just crushed
-                // by the expansion of the table.
+                /* Recurse because all the state needed by the *_lookup function was just crushed
+                 * by the expansion of the table.
+                 */
                 return pak_string_interner_intern(interner, str);
             }
         }
-        else if (handle->hash == hash && !elk_str_cmp(str, handle->str)) 
+        else if (handle->hash == hash && elk_str_eq(str, handle->str)) 
         {
-            // found it!
+            /* found it! */
             return handle->str;
         }
     }
@@ -576,7 +580,7 @@ pak_array_ledger_set_capacity(PakArrayLedger *array, size capacity)
 static PakHashMap 
 pak_hash_map_create(i8 size_exp, ElkSimpleHash key_hash, ElkEqFunction key_eq, MagAllocator *alloc)
 {
-    Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
+    Assert(size_exp > 0 && size_exp <= 31); /* Come on, 31 is HUGE */
 
     size const handles_len = (size)(1 << size_exp);
     PakHashMapHandle *handles = eco_nmalloc(alloc, handles_len, PakHashMapHandle);
@@ -615,11 +619,11 @@ pak_hash_table_expand(PakHashMap *map)
     {
         PakHashMapHandle *handle = &map->handles[i];
 
-        if (handle->key == NULL) { continue; } // Skip if it's empty
+        if (handle->key == NULL) { continue; } /* Skip if it's empty */
 
-        // Find the position in the new table and update it.
+        /* Find the position in the new table and update it. */
         u64 const hash = handle->hash;
-        u32 j = hash & 0xffffffff; // truncate
+        u32 j = hash & 0xffffffff; /* truncate */
         while (true) 
         {
             j = pak_hash_lookup(hash, new_size_exp, j);
@@ -627,9 +631,10 @@ pak_hash_table_expand(PakHashMap *map)
 
             if (!new_handle->key)
             {
-                // empty - put it here. Don't need to check for room because we just expanded
-                // the hash table of handles, and we're not copying anything new into storage,
-                // it's already there!
+                /* empty - put it here. Don't need to check for room because we just expanded
+                /  the hash table of handles, and we're not copying anything new into storage,
+                 * it's already there!
+                 */
                 *new_handle = *handle;
                 break;
             }
@@ -645,11 +650,12 @@ pak_hash_table_expand(PakHashMap *map)
 static inline void *
 pak_hash_map_insert(PakHashMap *map, void *key, void *value)
 {
-    // Inspired by https://nullprogram.com/blog/2022/08/08
-    // All code & writing on this blog is in the public domain.
+    /* Inspired by https://nullprogram.com/blog/2022/08/08
+     * All code & writing on this blog is in the public domain. 
+     */
 
     u64 const hash = map->hasher(key);
-    u32 i = hash & 0xffffffff; // truncate
+    u32 i = hash & 0xffffffff; /* truncate */
     while (true)
     {
         i = pak_hash_lookup(hash, map->size_exp, i);
@@ -657,7 +663,7 @@ pak_hash_map_insert(PakHashMap *map, void *key, void *value)
 
         if (!handle->key)
         {
-            // empty, insert here if room in the table of handles. Check for room first!
+            /* empty, insert here if room in the table of handles. Check for room first! */
             if (pak_hash_table_large_enough(map->num_handles, map->size_exp))
             {
 
@@ -668,17 +674,18 @@ pak_hash_map_insert(PakHashMap *map, void *key, void *value)
             }
             else 
             {
-                // Grow the table so we have room
+                /* Grow the table so we have room */
                 pak_hash_table_expand(map);
 
-                // Recurse because all the state needed by the *_lookup function was just crushed
-                // by the expansion of the table.
+                /* Recurse because all the state needed by the *_lookup function was just crushed
+                 * by the expansion of the table.
+                 */
                 return pak_hash_map_insert(map, key, value);
             }
         }
         else if (handle->hash == hash && map->eq(handle->key, key)) 
         {
-            // found it!
+            /* found it! */
             return handle->value;
         }
     }
@@ -689,11 +696,12 @@ pak_hash_map_insert(PakHashMap *map, void *key, void *value)
 static inline void *
 pak_hash_map_lookup(PakHashMap *map, void *key)
 {
-    // Inspired by https://nullprogram.com/blog/2022/08/08
-    // All code & writing on this blog is in the public domain.
+    /* Inspired by https://nullprogram.com/blog/2022/08/08
+     * All code & writing on this blog is in the public domain.
+     */
 
     u64 const hash = map->hasher(key);
-    u32 i = hash & 0xffffffff; // truncate
+    u32 i = hash & 0xffffffff; /* truncate */
     while (true)
     {
         i = pak_hash_lookup(hash, map->size_exp, i);
@@ -706,7 +714,7 @@ pak_hash_map_lookup(PakHashMap *map, void *key)
         }
         else if (handle->hash == hash && map->eq(handle->key, key)) 
         {
-            // found it!
+            /* found it! */
             return handle->value;
         }
     }
@@ -746,7 +754,7 @@ pak_hash_map_key_iter_next(PakHashMap *map, PakHashMapKeyIter *iter)
 static inline PakStrMap 
 pak_str_map_create(i8 size_exp, MagAllocator *alloc)
 {
-    Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
+    Assert(size_exp > 0 && size_exp <= 31); /* Come on, 31 is HUGE */
 
     size const handles_len = (size)(1 << size_exp);
     PakStrMapHandle *handles = eco_nmalloc(alloc, handles_len, PakStrMapHandle);
@@ -783,11 +791,11 @@ pak_str_table_expand(PakStrMap *map)
     {
         PakStrMapHandle *handle = &map->handles[i];
 
-        if (handle->key.start == NULL) { continue; } // Skip if it's empty
+        if (handle->key.start == NULL) { continue; } /* Skip if it's empty */
 
-        // Find the position in the new table and update it.
+        /* Find the position in the new table and update it. */
         u64 const hash = handle->hash;
-        u32 j = hash & 0xffffffff; // truncate
+        u32 j = hash & 0xffffffff; /* truncate */
         while (true) 
         {
             j = pak_hash_lookup(hash, new_size_exp, j);
@@ -795,9 +803,10 @@ pak_str_table_expand(PakStrMap *map)
 
             if (!new_handle->key.start)
             {
-                // empty - put it here. Don't need to check for room because we just expanded
-                // the hash table of handles, and we're not copying anything new into storage,
-                // it's already there!
+                /* empty - put it here. Don't need to check for room because we just expanded
+                 * the hash table of handles, and we're not copying anything new into storage,
+                 * it's already there!
+                 */
                 *new_handle = *handle;
                 break;
             }
@@ -813,11 +822,12 @@ pak_str_table_expand(PakStrMap *map)
 static inline void *
 pak_str_map_insert(PakStrMap *map, ElkStr key, void *value)
 {
-    // Inspired by https://nullprogram.com/blog/2022/08/08
-    // All code & writing on this blog is in the public domain.
+    /* Inspired by https://nullprogram.com/blog/2022/08/08
+     * All code & writing on this blog is in the public domain.
+     */
 
     u64 const hash = elk_fnv1a_hash_str(key);
-    u32 i = hash & 0xffffffff; // truncate
+    u32 i = hash & 0xffffffff; /* truncate */
     while (true)
     {
         i = pak_hash_lookup(hash, map->size_exp, i);
@@ -825,7 +835,7 @@ pak_str_map_insert(PakStrMap *map, ElkStr key, void *value)
 
         if (!handle->key.start)
         {
-            // empty, insert here if room in the table of handles. Check for room first!
+            /* empty, insert here if room in the table of handles. Check for room first! */
             if (pak_hash_table_large_enough(map->num_handles, map->size_exp))
             {
 
@@ -836,17 +846,18 @@ pak_str_map_insert(PakStrMap *map, ElkStr key, void *value)
             }
             else 
             {
-                // Grow the table so we have room
+                /* Grow the table so we have room */
                 pak_str_table_expand(map);
 
-                // Recurse because all the state needed by the *_lookup function was just crushed
-                // by the expansion of the table.
+                /* Recurse because all the state needed by the *_lookup function was just crushed
+                 * by the expansion of the table.
+                 */
                 return pak_str_map_insert(map, key, value);
             }
         }
-        else if (handle->hash == hash && !elk_str_cmp(key, handle->key)) 
+        else if (handle->hash == hash && elk_str_eq(key, handle->key)) 
         {
-            // found it! Replace value
+            /* found it! Replace value */
             void *tmp = handle->value;
             handle->value = value;
 
@@ -858,20 +869,21 @@ pak_str_map_insert(PakStrMap *map, ElkStr key, void *value)
 static inline void *
 pak_str_map_lookup(PakStrMap *map, ElkStr key)
 {
-    // Inspired by https://nullprogram.com/blog/2022/08/08
-    // All code & writing on this blog is in the public domain.
+    /* Inspired by https://nullprogram.com/blog/2022/08/08
+     * All code & writing on this blog is in the public domain.
+     */
 
     u64 const hash = elk_fnv1a_hash_str(key);
-    u32 i = hash & 0xffffffff; // truncate
+    u32 i = hash & 0xffffffff; /* truncate */
     while (true)
     {
         i = pak_hash_lookup(hash, map->size_exp, i);
         PakStrMapHandle *handle = &map->handles[i];
 
         if (!handle->key.start) { return NULL; }
-        else if (handle->hash == hash && !elk_str_cmp(key, handle->key)) 
+        else if (handle->hash == hash && elk_str_eq(key, handle->key)) 
         {
-            // found it!
+            /* found it! */
             return handle->value;
         }
     }
@@ -882,20 +894,21 @@ pak_str_map_lookup(PakStrMap *map, ElkStr key)
 static inline PakStrMapHandle const *
 pak_str_map_lookup_handle(PakStrMap *map, ElkStr key)
 {
-    // Inspired by https://nullprogram.com/blog/2022/08/08
-    // All code & writing on this blog is in the public domain.
+    /* Inspired by https://nullprogram.com/blog/2022/08/08
+     * All code & writing on this blog is in the public domain.
+     */
 
     u64 const hash = elk_fnv1a_hash_str(key);
-    u32 i = hash & 0xffffffff; // truncate
+    u32 i = hash & 0xffffffff; /* truncate */
     while (true)
     {
         i = pak_hash_lookup(hash, map->size_exp, i);
         PakStrMapHandle *handle = &map->handles[i];
 
         if (!handle->key.start) { return NULL; }
-        else if (handle->hash == hash && !elk_str_cmp(key, handle->key)) 
+        else if (handle->hash == hash && elk_str_eq(key, handle->key)) 
         {
-            // found it!
+            /* found it! */
             return handle;
         }
     }
@@ -969,7 +982,7 @@ pak_str_map_handle_iter_next(PakStrMap *map, PakStrMapHandleIter *iter)
 static inline PakHashSet 
 pak_hash_set_create(i8 size_exp, ElkSimpleHash val_hash, ElkEqFunction val_eq, MagAllocator *alloc)
 {
-    Assert(size_exp > 0 && size_exp <= 31); // Come on, 31 is HUGE
+    Assert(size_exp > 0 && size_exp <= 31); /* Come on, 31 is HUGE */
 
     size const handles_len = (size)(1 << size_exp);
     PakHashSetHandle *handles = eco_nmalloc(alloc, handles_len, PakHashSetHandle);
@@ -1008,11 +1021,11 @@ pak_hash_set_expand(PakHashSet *set)
     {
         PakHashSetHandle *handle = &set->handles[i];
 
-        if (handle->value == NULL) { continue; } // Skip if it's empty
+        if (handle->value == NULL) { continue; } /* Skip if it's empty */
 
-        // Find the position in the new table and update it.
+        /* Find the position in the new table and update it. */
         u64 const hash = handle->hash;
-        u32 j = hash & 0xffffffff; // truncate
+        u32 j = hash & 0xffffffff; /* truncate */
         while (true) 
         {
             j = pak_hash_lookup(hash, new_size_exp, j);
@@ -1020,9 +1033,10 @@ pak_hash_set_expand(PakHashSet *set)
 
             if (!new_handle->value)
             {
-                // empty - put it here. Don't need to check for room because we just expanded
-                // the hash table of handles, and we're not copying anything new into storage,
-                // it's already there!
+                /* empty - put it here. Don't need to check for room because we just expanded
+                 * the hash table of handles, and we're not copying anything new into storage,
+                 * it's already there!
+                 */
                 *new_handle = *handle;
                 break;
             }
@@ -1038,11 +1052,12 @@ pak_hash_set_expand(PakHashSet *set)
 static inline void *
 pak_hash_set_insert(PakHashSet *set, void *value)
 {
-    // Inspired by https://nullprogram.com/blog/2022/08/08
-    // All code & writing on this blog is in the public domain.
+    /* Inspired by https://nullprogram.com/blog/2022/08/08
+     * All code & writing on this blog is in the public domain.
+     */
 
     u64 const hash = set->hasher(value);
-    u32 i = hash & 0xffffffff; // truncate
+    u32 i = hash & 0xffffffff; /* truncate */
     while (true)
     {
         i = pak_hash_lookup(hash, set->size_exp, i);
@@ -1050,7 +1065,7 @@ pak_hash_set_insert(PakHashSet *set, void *value)
 
         if (!handle->value)
         {
-            // empty, insert here if room in the table of handles. Check for room first!
+            /* empty, insert here if room in the table of handles. Check for room first! */
             if (pak_hash_table_large_enough(set->num_handles, set->size_exp))
             {
 
@@ -1061,17 +1076,18 @@ pak_hash_set_insert(PakHashSet *set, void *value)
             }
             else 
             {
-                // Grow the table so we have room
+                /* Grow the table so we have room */
                 pak_hash_set_expand(set);
 
-                // Recurse because all the state needed by the *_lookup function was just crushed
-                // by the expansion of the set.
+                /* Recurse because all the state needed by the *_lookup function was just crushed
+                 * by the expansion of the set. 
+                 */
                 return pak_hash_set_insert(set, value);
             }
         }
         else if (handle->hash == hash && set->eq(handle->value, value)) 
         {
-            // found it!
+            /* found it! */
             return handle->value;
         }
     }
@@ -1082,11 +1098,12 @@ pak_hash_set_insert(PakHashSet *set, void *value)
 static inline void *
 pak_hash_set_lookup(PakHashSet *set, void *value)
 {
-    // Inspired by https://nullprogram.com/blog/2022/08/08
-    // All code & writing on this blog is in the public domain.
+    /* Inspired by https://nullprogram.com/blog/2022/08/08
+     * All code & writing on this blog is in the public domain.
+     */
 
     u64 const hash = set->hasher(value);
-    u32 i = hash & 0xffffffff; // truncate
+    u32 i = hash & 0xffffffff; /* truncate */
     while (true)
     {
         i = pak_hash_lookup(hash, set->size_exp, i);
@@ -1098,7 +1115,7 @@ pak_hash_set_lookup(PakHashSet *set, void *value)
         }
         else if (handle->hash == hash && set->eq(handle->value, value)) 
         {
-            // found it!
+            /* found it! */
             return handle->value;
         }
     }

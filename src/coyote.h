@@ -10,13 +10,6 @@
 #pragma warning(push)
 
 /*---------------------------------------------------------------------------------------------------------------------------
- * TODO: Things I'd like to add.
- *-------------------------------------------------------------------------------------------------------------------------*/
-// TODO: Formatted output.
-
-#define COY_ARRAY_SIZE(A) (sizeof(A) / sizeof(A[0]))
-
-/*---------------------------------------------------------------------------------------------------------------------------
  * Declare parts of the standard C library I use. These should almost always be implemented as compiler intrinsics anyway.
  *-------------------------------------------------------------------------------------------------------------------------*/
 
@@ -27,7 +20,7 @@ void *memmove(void *dest, void const *src, size_t num_bytes);
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                      Date and Time
  *-------------------------------------------------------------------------------------------------------------------------*/
-static inline u64 coy_time_now(void); // Get the current system time in seconds since midnight, Jan. 1 1970.
+static inline u64 coy_time_now(void); /* Get the current system time in seconds since midnight, Jan. 1 1970. */
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                     Files & Paths
@@ -56,7 +49,7 @@ typedef struct
  * assume_file conflicts with the system information about an existing file, the system information is used.               */
 static inline CoyPathInfo coy_path_info(char *path, b32 assume_file);
 
-// Append new path to the path in path_buffer, return true on success or false on error. path_buffer must be zero terminated.
+/* Append new path to the path in path_buffer, return true on success or false on error. path_buffer must be 0 terminated. */
 static inline b32 coy_path_append(size buf_len, char path_buffer[], char const *new_path);
 
 static inline size coy_file_size(char const *filename); /* size of a file in bytes, -1 on error. */
@@ -64,11 +57,11 @@ static inline size coy_file_size(char const *filename); /* size of a file in byt
 #define COY_FILE_READER_BUF_SIZE ECO_KiB(32)
 typedef struct
 {
-    iptr handle; // posix returns an int and windows a HANDLE (e.g. void*), this should work for all of them.
+    iptr handle; /* posix returns an int and windows a HANDLE (e.g. void*), this should work for all of them. */
     byte buffer[COY_FILE_READER_BUF_SIZE];
     size buf_cursor;
     size bytes_remaining;
-    b32 valid;   // error indicator
+    b32 valid;   /* error indicator */
 } CoyFileReader;
 
 static inline CoyFileReader coy_file_open_read(char const *filename);
@@ -102,18 +95,18 @@ static inline ElkStr coy_file_slurp_text_allocator(char const *filename, MagAllo
 #define COY_FILE_WRITER_BUF_SIZE ECO_KiB(32)
 typedef struct
 {
-    iptr handle; // posix returns an int and windows a HANDLE (e.g. void*), this should work for all of them.
+    iptr handle; /* posix returns an int and windows a HANDLE (e.g. void*), this should work for all of them. */
     byte buffer[COY_FILE_WRITER_BUF_SIZE];
     size buf_cursor;
-    b32 valid;   // error indicator
+    b32 valid;   /* error indicator */
 } CoyFileWriter;
 
-static inline CoyFileWriter coy_file_create(char const *filename); // Truncate if it already exists, otherwise create it.
-static inline CoyFileWriter coy_file_append(char const *filename); // Create file if it doesn't exist yet, otherwise append.
-static inline size coy_file_writer_flush(CoyFileWriter *file); /* Close will also do this, only use if ALL you need is flush */
-static inline void coy_file_writer_close(CoyFileWriter *file); /* Must set valid member to false on success or failure! */
+static inline CoyFileWriter coy_file_create(char const *filename); /* Truncate if it already exists, otherwise create it.        */
+static inline CoyFileWriter coy_file_append(char const *filename); /* Create file if it doesn't exist yet, otherwise append.     */
+static inline size coy_file_writer_flush(CoyFileWriter *file);     /* Close will also do this, only use if ALL you need is flush */
+static inline void coy_file_writer_close(CoyFileWriter *file);     /* Must set valid member to false on success or failure!      */
 
-static inline size coy_file_write(CoyFileWriter *file, size nbytes_write, byte const *buffer); // return nbytes written or -1 on error
+static inline size coy_file_write(CoyFileWriter *file, size nbytes_write, byte const *buffer); /* return nbytes written or -1 on error */
 static inline b32 coy_file_write_f64(CoyFileWriter *file, f64 val);
 static inline b32 coy_file_write_i8(CoyFileWriter *file, i8 val);
 static inline b32 coy_file_write_i16(CoyFileWriter *file, i16 val);
@@ -127,10 +120,10 @@ static inline b32 coy_file_write_str(CoyFileWriter *file, size len, char *str);
 
 typedef struct
 {
-    size size_in_bytes;     // size of the file
+    size size_in_bytes;     /* size of the file */
     byte const *data; 
-    iptr _internal[2];      // implementation specific data
-    b32 valid;              // error indicator
+    iptr _internal[2];      /* implementation specific data */
+    b32 valid;              /* error indicator */
 } CoyMemMappedFile;
 
 static inline CoyMemMappedFile coy_memmap_read_only(char const *filename);
@@ -147,17 +140,17 @@ static inline void coy_memmap_close(CoyMemMappedFile *file);
 
 typedef struct
 {
-    iptr os_handle;         // for internal use only
+    iptr os_handle;         /* for internal use only */
     char const *file_extension;
     b32 valid;
 } CoyFileNameIter;
 
-// Create an iterator. file_extension can be NULL if you want all files. Does not list directories. NOT THREADSAFE.
+/* Create an iterator. file_extension can be NULL if you want all files. Does not list directories. NOT THREADSAFE. */
 static inline CoyFileNameIter coy_file_name_iterator_open(char const *directory_path, char const *file_extension);
 
-// Returns NULL when done. Copy the string if you need it, it will be overwritten on the next call. NOT THREADSAFE.
+/* Returns NULL when done. Copy the string if you need it, it will be overwritten on the next call. NOT THREADSAFE. */
 static inline char const *coy_file_name_iterator_next(CoyFileNameIter *cfni);
-static inline void coy_file_name_iterator_close(CoyFileNameIter *cfin); // should leave the argument zeroed. NOT THREADSAFE.
+static inline void coy_file_name_iterator_close(CoyFileNameIter *cfin); /* should leave the argument zeroed. NOT THREADSAFE. */
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                         Dynamically Loading Shared Libraries
@@ -375,7 +368,7 @@ static inline u64 coy_profile_read_os_page_fault_count(void);
 #define COY_END_PROFILE(ap) coy_profile_end_block(&ap)
 
 #if COY_PROFILE
-#define COY_PROFILE_STATIC_CHECK _Static_assert(__COUNTER__ <= COY_ARRAY_SIZE(coy_global_profiler.blocks), "not enough profiler blocks")
+#define COY_PROFILE_STATIC_CHECK _Static_assert(__COUNTER__ <= ECO_ARRAY_SIZE(coy_global_profiler.blocks), "not enough profiler blocks")
 #else
 #define COY_PROFILE_STATIC_CHECK
 #endif
@@ -390,7 +383,7 @@ static inline u64 coy_profile_read_os_page_fault_count(void);
  *
  *-------------------------------------------------------------------------------------------------------------------------*/
 
-// assumes zero terminated string returned from OS - not for general use.
+/* assumes zero terminated string returned from OS - not for general use. */
 static inline char const *
 coy_file_extension(char const *path)
 {
@@ -407,7 +400,7 @@ coy_file_extension(char const *path)
     return extension;
 }
 
-// assumes zero terminated string returned from OS - not for general use.
+/* assumes zero terminated string returned from OS - not for general use. */
 static inline b32
 coy_null_term_strings_equal(char const *left, char const *right)
 {
@@ -939,7 +932,7 @@ coy_profile_end(void)
         coy_global_profiler.freq = 0;
     }
 
-    for(i32 i = 0; i < COY_ARRAY_SIZE(coy_global_profiler.blocks); ++i)
+    for(i32 i = 0; i < ECO_ARRAY_SIZE(coy_global_profiler.blocks); ++i)
     {
         CoyBlockProfiler *block = coy_global_profiler.blocks + i;
         if(block->tsc_elapsed_inclusive)

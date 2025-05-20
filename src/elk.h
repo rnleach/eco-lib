@@ -22,14 +22,6 @@
 #endif
 
 /*---------------------------------------------------------------------------------------------------------------------------
- * TODO: Things I'd like to add.
- *-------------------------------------------------------------------------------------------------------------------------*/
-// TODO: Substring Search.
-// TODO: Add ElkCStr type that guarantees a terminating zero to make life easier interoperating with C stdlib.
-// TODO: Add ElkConstStr a string slice whose contents are const. Maybe I should go the other way around and make ElkStr
-//       const by default and make an ElkMutableStr.
-
-/*---------------------------------------------------------------------------------------------------------------------------
  *                                                 Define simpler types
  *-------------------------------------------------------------------------------------------------------------------------*/
 
@@ -67,6 +59,11 @@ typedef int64_t     i64;
 #endif
 
 /*---------------------------------------------------------------------------------------------------------------------------
+ * Declare parts of the standard C library I use. These should almost always be implemented as compiler intrinsics anyway.
+ *-------------------------------------------------------------------------------------------------------------------------*/
+
+int memcmp(const void *s1, const void *s2, size_t n);
+/*---------------------------------------------------------------------------------------------------------------------------
  *
  *                                                      Memory Sizes
  *
@@ -81,6 +78,8 @@ typedef int64_t     i64;
 #define ECO_MB(a) (ECO_KB(a) * INT64_C(1000))
 #define ECO_GB(a) (ECO_MB(a) * INT64_C(1000))
 #define ECO_TB(a) (ECO_GB(a) * INT64_C(1000))
+
+#define ECO_ARRAY_SIZE(A) (sizeof(A) / sizeof(A[0])) /* Only works on arrays and not pointers! */
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                 Mathematical Constants
@@ -132,7 +131,7 @@ int memcmp(const void *s1, const void *s2, size_t num_bytes);
  *                                                       Error Handling
  *-------------------------------------------------------------------------------------------------------------------------*/
 
-// Crash immediately, useful with a debugger!
+/* Crash immediately, useful with a debugger! */
 #ifndef HARD_EXIT
   #define HARD_EXIT (*(int volatile*)0) 
 #endif
@@ -317,7 +316,7 @@ static inline b32 elk_str_parse_date(ElkStr str, ElkDate *out);     /* detect fo
 typedef b32 (*ElkEqFunction)(void const *left, void const *right);
 
 typedef u64 (*ElkHashFunction)(size const size_bytes, void const *value);
-typedef u64 (*ElkSimpleHash)(void const *object); // Already knows the size of the object to be hashed!
+typedef u64 (*ElkSimpleHash)(void const *object); /* Already knows the size of the object to be hashed! */
 
 static inline u64 elk_fnv1a_hash(size const n, void const *value);
 static inline u64 elk_fnv1a_hash_accumulate(size const size_bytes, void const *value, u64 const hash_so_far);
@@ -352,17 +351,17 @@ static inline u64 elk_fnv1a_hash_str(ElkStr str);
  */
 typedef struct
 {
-    size row;     // The number of CSV rows parsed so far, this includes blank lines.
-    size col;     // CSV column, that is, how many commas have we passed
-    ElkStr value; // The value not including the comma or any new line character
+    size row;     /* The number of CSV rows parsed so far, this includes blank lines. */
+    size col;     /* CSV column, that is, how many commas have we passed              */
+    ElkStr value; /* The value not including the comma or any new line character      */
 } ElkCsvToken;
 
 typedef struct
 {
-    ElkStr remaining;       // The portion of the string remaining to be parsed. Useful for diagnosing parse errors.
-    size row;               // Only counts parseable rows, comment lines don't count.
-    size col;               // CSV column, that is, how many commas have we passed on this line.
-    b32 error;              // Have we encountered an error while parsing?
+    ElkStr remaining;       /* The portion of the string remaining to be parsed. Useful for diagnosing parse errors. */
+    size row;               /* Only counts parseable rows, comment lines don't count.                                */
+    size col;               /* CSV column, that is, how many commas have we passed on this line.                     */
+    b32 error;              /* Have we encountered an error while parsing?                                           */
 #if __AVX2__
     i32 byte_pos;
 
@@ -452,7 +451,7 @@ elk_num_leap_years_since_epoch(i64 year)
 static inline i64
 elk_days_since_epoch(int year)
 {
-    // Days in the years up to now.
+    /* Days in the years up to now. */
     i64 const num_leap_years_since_epoch = elk_num_leap_years_since_epoch(year);
     i64 ts = (year - 1) * DAYS_PER_YEAR + num_leap_years_since_epoch;
 
@@ -540,7 +539,7 @@ elk_time_difference(ElkTime a, ElkTime b)
     return a - b;
 }
 
-// Days in a year up to beginning of month
+/* Days in a year up to beginning of month */
 static i64 const sum_days_to_month[2][13] = {
     {0, 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334},
     {0, 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335},
@@ -557,19 +556,19 @@ elk_time_from_ymd_and_hms(int year, int month, int day, int hour, int minutes, i
     Assert(minutes >= 0 && minutes <= 59);
     Assert(seconds >= 0 && seconds <= 59);
 
-    // Seconds in the years up to now.
+    /* Seconds in the years up to now. */
     i64 const num_leap_years_since_epoch = elk_num_leap_years_since_epoch(year);
     ElkTime ts = (year - 1) * SECONDS_PER_YEAR + num_leap_years_since_epoch * SECONDS_PER_DAY;
 
-    // Seconds in the months up to the start of this month
+    /* Seconds in the months up to the start of this month */
     i64 const days_until_start_of_month =
         elk_is_leap_year(year) ? sum_days_to_month[1][month] : sum_days_to_month[0][month];
     ts += days_until_start_of_month * SECONDS_PER_DAY;
 
-    // Seconds in the days of the month up to this one.
+    /* Seconds in the days of the month up to this one. */
     ts += (day - 1) * SECONDS_PER_DAY;
 
-    // Seconds in the hours, minutes, & seconds so far this day.
+    /* Seconds in the hours, minutes, & seconds so far this day. */
     ts += hour * SECONDS_PER_HOUR;
     ts += minutes * SECONDS_PER_MINUTE;
     ts += seconds;
@@ -588,14 +587,14 @@ elk_time_from_yd_and_hms(int year, int day_of_year, int hour, int minutes, int s
     Assert(minutes >= 0 && minutes <= 59);
     Assert(seconds >= 0 && seconds <= 59);
 
-    // Seconds in the years up to now.
+    /* Seconds in the years up to now. */
     i64 const num_leap_years_since_epoch = elk_num_leap_years_since_epoch(year);
     ElkTime ts = (year - 1) * SECONDS_PER_YEAR + num_leap_years_since_epoch * SECONDS_PER_DAY;
 
-    // Seconds in the days up to now.
+    /* Seconds in the days up to now. */
     ts += (day_of_year - 1) * SECONDS_PER_DAY;
 
-    // Seconds in the hours, minutes, & seconds so far this day.
+    /* Seconds in the hours, minutes, & seconds so far this day. */
     ts += hour * SECONDS_PER_HOUR;
     ts += minutes * SECONDS_PER_MINUTE;
     ts += seconds;
@@ -610,26 +609,26 @@ elk_make_struct_time(ElkTime time)
 {
     Assert(time >= 0);
 
-    // Get the seconds part and then trim it off and convert to minutes
+    /* Get the seconds part and then trim it off and convert to minutes */
     int const second = (int const)(time % SECONDS_PER_MINUTE);
     time = (time - second) / SECONDS_PER_MINUTE;
     Assert(time >= 0 && second >= 0 && second <= 59);
 
-    // Get the minutes part, trim it off and convert to hours.
+    /* Get the minutes part, trim it off and convert to hours. */
     int const minute = (int const)(time % MINUTES_PER_HOUR);
     time = (time - minute) / MINUTES_PER_HOUR;
     Assert(time >= 0 && minute >= 0 && minute <= 59);
 
-    // Get the hours part, trim it off and convert to days.
+    /* Get the hours part, trim it off and convert to days. */
     int const hour = (int const)(time % HOURS_PER_DAY);
     time = (time - hour) / HOURS_PER_DAY;
     Assert(time >= 0 && hour >= 0 && hour <= 23);
 
-    // Rename variable for clarity
+    /* Rename variable for clarity */
     i64 const days_since_epoch = time;
 
-    // Calculate the year
-    int year = (int)(days_since_epoch / (DAYS_PER_YEAR) + 1); // High estimate, but good starting point.
+    /* Calculate the year */
+    int year = (int)(days_since_epoch / (DAYS_PER_YEAR) + 1); /* High estimate, but good starting point. */
     i64 test_time = elk_days_since_epoch(year);
     while (test_time > days_since_epoch) 
     {
@@ -639,11 +638,11 @@ elk_make_struct_time(ElkTime time)
         test_time = elk_days_since_epoch(year);
     }
     Assert(test_time <= elk_days_since_epoch(year));
-    time -= elk_days_since_epoch(year); // Now it's days since start of the year.
+    time -= elk_days_since_epoch(year); /* Now it's days since start of the year. */
     Assert(time >= 0);
     i16 day_of_year = (i16)(time + 1);
 
-    // Calculate the month
+    /* Calculate the month */
     int month = 0;
     int leap_year_idx = elk_is_leap_year(year) ? 1 : 0;
     for (month = 1; month <= 11; month++)
@@ -651,9 +650,9 @@ elk_make_struct_time(ElkTime time)
         if (sum_days_to_month[leap_year_idx][month + 1] > time) { break; }
     }
     Assert(time >= 0 && month > 0 && month <= 12);
-    time -= sum_days_to_month[leap_year_idx][month]; // Now in days since start of month
+    time -= sum_days_to_month[leap_year_idx][month]; /* Now in days since start of month */
 
-    // Calculate the day
+    /* Calculate the day */
     int const day = (int const)(time + 1);
     Assert(day > 0 && day <= 31);
 
@@ -676,8 +675,8 @@ elk_make_struct_date(ElkDate date)
 
     i64 const days_since_epoch = date;
 
-    // Calculate the year
-    int year = (int)(days_since_epoch / (DAYS_PER_YEAR) + 1); // High estimate, but good starting point.
+    /* Calculate the year */
+    int year = (int)(days_since_epoch / (DAYS_PER_YEAR) + 1); /* High estimate, but good starting point. */
     i64 test_time = elk_days_since_epoch(year);
     while (test_time > days_since_epoch) 
     {
@@ -687,11 +686,11 @@ elk_make_struct_date(ElkDate date)
         test_time = elk_days_since_epoch(year);
     }
     Assert(test_time <= elk_days_since_epoch(year));
-    date -= (i32)elk_days_since_epoch(year); // Now it's days since start of the year.
+    date -= (i32)elk_days_since_epoch(year); /* Now it's days since start of the year. */
     Assert(date >= 0);
     Assert(year >= 1 && year <= INT16_MAX);
 
-    // Calculate the month
+    /* Calculate the month */
     int month = 0;
     int leap_year_idx = elk_is_leap_year(year) ? 1 : 0;
     for (month = 1; month <= 11; month++)
@@ -699,9 +698,9 @@ elk_make_struct_date(ElkDate date)
         if (sum_days_to_month[leap_year_idx][month + 1] > date) { break; }
     }
     Assert(date >= 0 && month >= 1 && month <= 12);
-    date -= (i32)sum_days_to_month[leap_year_idx][month]; // Now in days since start of month
+    date -= (i32)sum_days_to_month[leap_year_idx][month]; /* Now in days since start of month */
 
-    // Calculate the day
+    /* Calculate the day */
     int const day = (int const)(date + 1);
     Assert(day >= 1 && day <= 31);
 
@@ -727,16 +726,16 @@ elk_date_from_ymd(int year, int month, int day)
     Assert(day >= 1 && day <= 31);
     Assert(month >= 1 && month <= 12);
 
-    // Days in the years up to now.
+    /* Days in the years up to now. */
     i32 const num_leap_years_since_epoch = (i32)elk_num_leap_years_since_epoch(year);
     ElkDate dt = (year - 1) * 365 + num_leap_years_since_epoch;
 
-    // Days in the months up to the start of this month
+    /* Days in the months up to the start of this month */
     i64 const days_until_start_of_month =
         elk_is_leap_year(year) ? sum_days_to_month[1][month] : sum_days_to_month[0][month];
     dt += (i32)days_until_start_of_month;
 
-    // Days in the days of the month up to this one.
+    /* Days in the days of the month up to this one. */
     dt += (day - 1);
 
     Assert(dt >= 0 && dt <= 11967899);
@@ -760,7 +759,7 @@ static inline ElkStr
 elk_str_from_cstring(char *src)
 {
     size len;
-    for (len = 0; *(src + len) != '\0'; ++len) ; // intentionally left blank.
+    for (len = 0; *(src + len) != '\0'; ++len) ; /* intentionally left blank. */
     return (ElkStr){.start = src, .len = len};
 }
 
@@ -770,7 +769,7 @@ elk_str_copy(size dst_len, char *restrict dest, ElkStr src)
     size const copy_len = src.len < dst_len ? src.len : dst_len;
     memcpy(dest, src.start, copy_len);
 
-    // Add a terminating zero IFF we can.
+    /* Add a terminating zero IFF we can. */
     if(copy_len < dst_len) { dest[copy_len] = '\0'; }
 
     return (ElkStr){.start = dest, .len = copy_len};
@@ -819,15 +818,8 @@ static inline b32
 elk_str_eq(ElkStr const left, ElkStr const right)
 {
     if (left.len != right.len) { return false; }
-
     size len = left.len > right.len ? right.len : left.len;
-
-    for (size i = 0; i < len; ++i)
-    {
-        if (left.start[i] != right.start[i]) { return false; }
-    }
-
-    return true;
+    return !memcmp(left.start, right.start, len);
 }
 
 static inline ElkStrSplitPair
@@ -858,21 +850,21 @@ elk_str_helper_parse_i64(ElkStr str, i64 *result)
     char const *c = str.start;
     while (true)
     {
-        // We've reached the end of the string.
+        /* We've reached the end of the string. */
         if (!*c || c >= (str.start + (uptr)str.len)) { break; }
 
-        // Is a digit?
+        /* Is a digit? */
         if (*c + 0U - '0' <= 9U) 
         {
-            in_digits = true;                    // Signal we've passed +/- signs
-            parsed = parsed * 10 + (*c - '0');   // Accumulate digits
+            in_digits = true;                    /* Signal we've passed +/- signs */
+            parsed = parsed * 10 + (*c - '0');   /* Accumulate digits */
 
         }
         else if (*c == '-' && !in_digits) { neg_flag = true; }
         else if (*c == '+' && !in_digits) { neg_flag = false; }
         else { return false; }
 
-        // Move to the next character
+        /* Move to the next character */
         ++c;
     }
 
@@ -883,7 +875,7 @@ elk_str_helper_parse_i64(ElkStr str, i64 *result)
 static inline b32
 elk_str_parse_i64(ElkStr str, i64 *result)
 {
-    // Empty string is an error
+    /* Empty string is an error */
     StopIf(str.len == 0, return false);
 
 #if 0
@@ -892,7 +884,7 @@ elk_str_parse_i64(ElkStr str, i64 *result)
      */
     if(str.len <= 16 && ((((uptr)str.start + str.len) % ECO_KiB(4)) >= 16))
     {
-        // _0_ Load, but ensure the last digit is in the last position
+        /* _0_ Load, but ensure the last digit is in the last position */
         u8 len = (u8)str.len;
         uptr start = (uptr)str.start + str.len - 16;
         __m128i value = _mm_loadu_si128((__m128i const *)start);
@@ -900,7 +892,7 @@ elk_str_parse_i64(ElkStr str, i64 *result)
         __m128i const positions_mask = _mm_cmpgt_epi8(positions, _mm_set1_epi8(len));
         value = _mm_andnot_si128(positions_mask, value);                                 /* Mask out data we didn't want.*/
  
-        // _1_ detect negative sign
+        /* _1_ detect negative sign */
         __m128i const neg_sign = _mm_set1_epi8('-');
         __m128i const pos_sign = _mm_set1_epi8('+');
         __m128i const neg_mask = _mm_cmpeq_epi8(value, neg_sign);
@@ -910,50 +902,50 @@ elk_str_parse_i64(ElkStr str, i64 *result)
         neg_flag = (neg_flag >> (16 - str.len)) & 0x01; /* 0-false or 1-true, remember movemask reverses bits. */
         pos_flag = (pos_flag >> (16 - str.len)) & 0x01; /* 0-false or 1-true, remember movemask reverses bits. */
 
-        // _2_ mask out negative sign and non-digit characters
+        /* _2_ mask out negative sign and non-digit characters */
         __m128i const not_digits = _mm_or_si128(
                 _mm_cmpgt_epi8(value, _mm_set1_epi8('9')),
                 _mm_cmplt_epi8(value, _mm_set1_epi8('0')));
         value = _mm_andnot_si128(not_digits, value);
 
-        // _3_ movemask to get bits representing data
+        /* _3_ movemask to get bits representing data */
         u32 const digit_bits = (~_mm_movemask_epi8(not_digits)) & 0xFFFF;
 
-        // _4_ _mm_popcnt_u32 to get the number of digits, depending on - sign, if less than string length, ERROR!
+        /* _4_ _mm_popcnt_u32 to get the number of digits, depending on - sign, if less than string length, ERROR! */
         i32 const num_digits = _mm_popcnt_u32(digit_bits);
         if(num_digits < ((neg_flag || pos_flag) ? len - 1 : len)) { return false; }
 
-        // _5_ subtract '0' from fields with digits.
+        /* _5_ subtract '0' from fields with digits. */
         __m128i const zero_char = _mm_set1_epi8('0');
         value = _mm_sub_epi8(value, zero_char);
         value = _mm_andnot_si128(not_digits, value);     /* Re-zero the bytes that had zeros before this operation */
         
-        // _6_ _mm_maddubs_epi16(_2_, first constant)
+        /* _6_ _mm_maddubs_epi16(_2_, first constant) */
         __m128i const m1 = _mm_setr_epi8(10, 1, 10, 1, 10, 1, 10, 1, 10, 1, 10, 1, 10, 1, 10, 1);
         value = _mm_maddubs_epi16(value, m1);
         
-        // _7_ _mm_madd_epi16(_6_, second constant)
+        /* _7_ _mm_madd_epi16(_6_, second constant) */
         __m128i const m2 = _mm_setr_epi16(100, 1, 100, 1, 100, 1, 100, 1);
         value = _mm_madd_epi16(value, m2);
 
-        // _8_ _mm_packs_epi32(_7_, _7_)
+        /* _8_ _mm_packs_epi32(_7_, _7_) */
         value = _mm_packs_epi32(_mm_setzero_si128(), value);
 
-        // _9_ _mm_madd_epi16(_8_, third constant)
+        /* _9_ _mm_madd_epi16(_8_, third constant) */
         __m128i const m3 = _mm_setr_epi16(0, 0, 0, 0, 10000, 1, 10000, 1);
         value = _mm_madd_epi16(value, m3);
 
-        // _10_ _mm_mul_epu32(_10_, fourth constant multiplier)
+        /* _10_ _mm_mul_epu32(_10_, fourth constant multiplier) */
         __m128i const m4 = _mm_set1_epi32(100000000);
         __m128i value_top = _mm_mul_epu32(value, m4);
 
-        // _11_ shuffle value into little endian for the 64 bit add coming up. _mm_shuffle_epi32(_9_, 0xB4) 0b 00 11 00 00
+        /* _11_ shuffle value into little endian for the 64 bit add coming up. _mm_shuffle_epi32(_9_, 0xB4) 0b 00 11 00 00 */
         value = _mm_shuffle_epi32(value, 0x30); 
 
-        // _12_ _mm_add_epi64(_9_, _11_)
+        /* _12_ _mm_add_epi64(_9_, _11_) */
         value = _mm_add_epi64(value, value_top);
 
-        // _13_ __int64 val = _mm_extract_epi64(_12_, 0)
+        /* _13_ __int64 val = _mm_extract_epi64(_12_, 0) */
         *result = (neg_flag ? -1 : 1) * _mm_extract_epi64(value, 1);
         return true;
 
@@ -971,8 +963,8 @@ elk_str_parse_i64(ElkStr str, i64 *result)
 static inline b32
 elk_str_robust_parse_f64(ElkStr str, f64 *out)
 {
-    // The following block is required to create NAN/INF witnout using math.h on MSVC Using
-    // #define NAN (0.0/0.0) doesn't work either on MSVC, which gives C2124 divide by zero error.
+    /* The following block is required to create NAN/INF witnout using math.h on MSVC Using */
+    /* #define NAN (0.0/0.0) doesn't work either on MSVC, which gives C2124 divide by zero error. */
     static f64 const ELK_ZERO = 0.0;
     f64 const ELK_INF = 1.0 / ELK_ZERO;
     f64 const ELK_NEG_INF = -1.0 / ELK_ZERO;
@@ -984,17 +976,17 @@ elk_str_robust_parse_f64(ElkStr str, f64 *out)
     char const *end = str.start + str.len;
     size len_remaining = str.len;
 
-    i8 sign = 0;        // 0 is positive, 1 is negative
-    i8 exp_sign = 0;    // 0 is positive, 1 is negative
+    i8 sign = 0;        /* 0 is positive, 1 is negative */
+    i8 exp_sign = 0;    /* 0 is positive, 1 is negative */
     i16 exponent = 0;
     i64 mantissa = 0;
-    i16 extra_exp = 0;  // decimal places after the point
+    i16 extra_exp = 0;  /* decimal places after the point */
 
-    // Check & parse a sign
+    /* Check & parse a sign */
     if (*c == '-')      { sign =  1; --len_remaining; ++c; }
     else if (*c == '+') { sign =  0; --len_remaining; ++c; }
 
-    // check for nan/NAN/NaN/Nan inf/INF/Inf
+    /* check for nan/NAN/NaN/Nan inf/INF/Inf */
     if (len_remaining == 3) 
     {
         if(memcmp(c, "nan", 3) == 0 || memcmp(c, "NAN", 3) == 0 || memcmp(c, "NaN", 3) == 0 || memcmp(c, "Nan", 3) == 0) 
@@ -1010,7 +1002,7 @@ elk_str_robust_parse_f64(ElkStr str, f64 *out)
         }
     }
 
-    // check for infinity/INFINITY/Infinity
+    /* check for infinity/INFINITY/Infinity */
     if (len_remaining == 8) 
     {
         if(memcmp(c, "infinity", 8) == 0 || memcmp(c, "Infinity", 8) == 0 || memcmp(c, "INFINITY", 8) == 0)
@@ -1021,7 +1013,7 @@ elk_str_robust_parse_f64(ElkStr str, f64 *out)
         }
     }
 
-    // Parse the mantissa up to the decimal point or exponent part
+    /* Parse the mantissa up to the decimal point or exponent part */
     char digit;
     while (c < end)
     {
@@ -1038,19 +1030,19 @@ elk_str_robust_parse_f64(ElkStr str, f64 *out)
         }
     }
 
-    // Check for the decimal point
+    /* Check for the decimal point */
     if(c < end && *c == '.')
     {
         ++c;
 
-        // Parse the mantissa up to the decimal point or exponent part
+        /* Parse the mantissa up to the decimal point or exponent part */
         while(c < end)
         {
             digit = *c - '0';
 
             if(digit < 10 && digit >= 0)
             {
-                // overflow check
+                /* overflow check */
                 StopIf((INT64_MAX - digit) / 10 < mantissa, goto ERR_RETURN); 
 
                 mantissa = mantissa * 10 + digit;
@@ -1065,10 +1057,10 @@ elk_str_robust_parse_f64(ElkStr str, f64 *out)
         }
     }
 
-    // Account for negative signs
+    /* Account for negative signs */
     mantissa = sign == 1 ? -mantissa : mantissa;
 
-    // Start the exponent
+    /* Start the exponent */
     if(c < end && (*c == 'e' || *c == 'E')) 
     {
         ++c;
@@ -1076,14 +1068,14 @@ elk_str_robust_parse_f64(ElkStr str, f64 *out)
         if (*c == '-') { exp_sign = 1; ++c; }
         else if (*c == '+') { exp_sign = 0; ++c; }
 
-        // Parse the mantissa up to the decimal point or exponent part
+        /* Parse the mantissa up to the decimal point or exponent part */
         while(c < end)
         {
             digit = *c - '0';
 
             if(digit < 10 && digit >= 0)
             {
-                // Overflow check
+                /* Overflow check */
                 StopIf((INT16_MAX - digit) / 10 < exponent, goto ERR_RETURN); 
 
                 exponent = exponent * 10 + digit;
@@ -1096,17 +1088,17 @@ elk_str_robust_parse_f64(ElkStr str, f64 *out)
             }
         }
 
-        // Account for negative signs
+        /* Account for negative signs */
         exponent = exp_sign == 1 ? -exponent : exponent;
     }
 
-    // Once we get here we're done. Should be end of string.
+    /* Once we get here we're done. Should be end of string. */
     StopIf( c!= end, goto ERR_RETURN);
 
-    // Account for decimal point location.
+    /* Account for decimal point location. */
     exponent -= extra_exp;
 
-    // Check for overflow
+    /* Check for overflow */
     StopIf(exponent < -307 || exponent > 308, goto ERR_RETURN);
 
     f64 exp_part = 1.0;
@@ -1129,8 +1121,8 @@ ERR_RETURN:
 static inline b32 
 elk_str_fast_parse_f64(ElkStr str, f64 *out)
 {
-    // The following block is required to create NAN/INF witnout using math.h on MSVC Using
-    // #define NAN (0.0/0.0) doesn't work either on MSVC, which gives C2124 divide by zero error.
+    /* The following block is required to create NAN/INF witnout using math.h on MSVC Using */
+    /* #define NAN (0.0/0.0) doesn't work either on MSVC, which gives C2124 divide by zero error. */
     static f64 const ELK_ZERO = 0.0;
     f64 const ELK_INF = 1.0 / ELK_ZERO;
     f64 const ELK_NEG_INF = -1.0 / ELK_ZERO;
@@ -1141,17 +1133,17 @@ elk_str_fast_parse_f64(ElkStr str, f64 *out)
     char const *c = str.start;
     char const *end = str.start + str.len;
 
-    i8 sign = 0;        // 0 is positive, 1 is negative
-    i8 exp_sign = 0;    // 0 is positive, 1 is negative
+    i8 sign = 0;        /* 0 is positive, 1 is negative */
+    i8 exp_sign = 0;    /* 0 is positive, 1 is negative */
     i16 exponent = 0;
     i64 mantissa = 0;
-    i16 extra_exp = 0;  // decimal places after the point
+    i16 extra_exp = 0;  /* decimal places after the point */
 
-    // Check & parse a sign
+    /* Check & parse a sign */
     if (*c == '-')      { sign =  1; ++c; }
     else if (*c == '+') { sign =  0; ++c; }
 
-    // Parse the mantissa up to the decimal point or exponent part
+    /* Parse the mantissa up to the decimal point or exponent part */
     char digit = *c - '0';
     while (c < end && digit  < 10 && digit  >= 0)
     {
@@ -1160,12 +1152,12 @@ elk_str_fast_parse_f64(ElkStr str, f64 *out)
         digit = *c - '0';
     }
 
-    // Check for the decimal point
+    /* Check for the decimal point */
     if (c < end && *c == '.')
     {
         ++c;
 
-        // Parse the mantissa up to the decimal point or exponent part
+        /* Parse the mantissa up to the decimal point or exponent part */
         digit = *c - '0';
         while (c < end && digit < 10 && digit >= 0)
         {
@@ -1177,10 +1169,10 @@ elk_str_fast_parse_f64(ElkStr str, f64 *out)
         }
     }
 
-    // Account for negative signs
+    /* Account for negative signs */
     mantissa = sign == 1 ? -mantissa : mantissa;
 
-    // Start the exponent
+    /* Start the exponent */
     if (c < end && (*c == 'e' || *c == 'E')) 
     {
         ++c;
@@ -1188,7 +1180,7 @@ elk_str_fast_parse_f64(ElkStr str, f64 *out)
         if (*c == '-') { exp_sign = 1; ++c; }
         else if (*c == '+') { exp_sign = 0; ++c; }
 
-        // Parse the mantissa up to the decimal point or exponent part
+        /* Parse the mantissa up to the decimal point or exponent part */
         digit = *c - '0';
         while (c < end && digit < 10 && digit >= 0)
         {
@@ -1198,11 +1190,11 @@ elk_str_fast_parse_f64(ElkStr str, f64 *out)
             digit = *c - '0';
         }
 
-        // Account for negative signs
+        /* Account for negative signs */
         exponent = exp_sign == 1 ? -exponent : exponent;
     }
 
-    // Account for decimal point location.
+    /* Account for decimal point location. */
     exponent -= extra_exp;
 
     f64 exp_part = 1.0;
@@ -1294,7 +1286,7 @@ elk_str_parse_datetime_long_format(ElkStr str, ElkTime *out)
 static inline b32
 elk_str_parse_datetime_compact_doy(ElkStr str, ElkTime *out)
 {
-    // YYYYDDDHHMMSS format
+    /* YYYYDDDHHMMSS format */
     i64 year = INT64_MIN;
     i64 day_of_year = INT64_MIN;
     i64 hour = INT64_MIN;
@@ -1318,13 +1310,13 @@ elk_str_parse_datetime_compact_doy(ElkStr str, ElkTime *out)
 static inline b32
 elk_str_parse_datetime(ElkStr str, ElkTime *out)
 {
-    // Check the length to find out what type of string we are parsing.
+    /* Check the length to find out what type of string we are parsing. */
     switch(str.len)
     {
-        // YYYY-MM-DD HH:MM:SS and YYYY-MM-DDTHH:MM:SS formats
+        /* YYYY-MM-DD HH:MM:SS and YYYY-MM-DDTHH:MM:SS formats */
         case 19: return elk_str_parse_datetime_long_format(str, out);
 
-        // YYYYDDDHHMMSS format
+        /* YYYYDDDHHMMSS format */
         case 13: return elk_str_parse_datetime_compact_doy(str, out);
 
         default: return false;
@@ -1427,10 +1419,10 @@ elk_csv_create_parser(ElkStr input)
 {
     ElkCsvParser parser = { .remaining=input, .row=0, .col=0, .error=false };
 
-    // Scan past leading comment lines.
+    /* Scan past leading comment lines. */
     while(*parser.remaining.start == '#')
     {
-        // We must be on a comment line if we got here, so read just past the end of the line
+        /* We must be on a comment line if we got here, so read just past the end of the line */
         while(*parser.remaining.start && parser.remaining.len > 0)
         {
             char last_char = *parser.remaining.start;
@@ -1461,16 +1453,16 @@ elk_csv_full_next_token(ElkCsvParser *parser)
 {
     StopIf(elk_csv_finished(parser), goto ERR_RETURN);
 
-    // Current position in parser and how much we've processed
+    /* Current position in parser and how much we've processed */
     char *next_char = parser->remaining.start;
     int num_chars_proc = 0;
     size row = parser->row;
     size col = parser->col;
 
-    // Handle comment lines
+    /* Handle comment lines */
     while(col == 0 && *next_char == '#')
     {
-        // We must be on a comment line if we got here, so read just past the end of the line
+        /* We must be on a comment line if we got here, so read just past the end of the line */
         
         while(*next_char && parser->remaining.len - num_chars_proc > 0)
         {
@@ -1481,11 +1473,11 @@ elk_csv_full_next_token(ElkCsvParser *parser)
         }
     }
 
-    // The data for the next value to return
+    /* The data for the next value to return */
     char *next_value_start = next_char;
     size next_value_len = 0;
 
-    // Are we in a quoted string where we should ignore commas?
+    /* Are we in a quoted string where we should ignore commas? */
     b32 stop = false;
     u32 carry = 0;
 
@@ -1810,12 +1802,12 @@ elk_csv_fast_next_token(ElkCsvParser *parser)
 static inline ElkStr 
 elk_csv_unquote_str(ElkStr str, ElkStr const buffer)
 {
-    // remove any leading and trailing white space
+    /* remove any leading and trailing white space */
     str = elk_str_strip(str);
 
     if(str.len >= 2 && str.start[0] == '"')
     {
-        // Ok, now we've got a quoted non-empty string.
+        /* Ok, now we've got a quoted non-empty string. */
         int next_read = 1;
         int next_write = 0;
         size len = 0;
@@ -1844,7 +1836,7 @@ elk_csv_unquote_str(ElkStr str, ElkStr const buffer)
 static inline ElkStr 
 elk_csv_simple_unquote_str(ElkStr str)
 {
-    // Handle string that isn't even quoted!
+    /* Handle string that isn't even quoted! */
     if(str.len < 2 || str.start[0] != '"') { return str; }
 
     return (ElkStr){ .start = str.start + 1, .len = str.len - 2};
