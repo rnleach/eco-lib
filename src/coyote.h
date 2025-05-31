@@ -67,6 +67,7 @@ typedef struct
 static inline CoyFileReader coy_file_open_read(char const *filename);
 static inline size coy_file_read(CoyFileReader *file, size buf_size, byte *buffer); /* return nbytes read or -1 on error                           */
 static inline b32 coy_file_read_f64(CoyFileReader *file, f64 *val);
+static inline b32 coy_file_read_f32(CoyFileReader *file, f32 *val);
 static inline b32 coy_file_read_i8(CoyFileReader *file, i8 *val);
 static inline b32 coy_file_read_i16(CoyFileReader *file, i16 *val);
 static inline b32 coy_file_read_i32(CoyFileReader *file, i32 *val);
@@ -79,7 +80,7 @@ static inline b32 coy_file_read_str(CoyFileReader *file, size *len, char *str); 
 static inline void coy_file_reader_close(CoyFileReader *file);                      /* Must set valid member to false on success or failure!       */
 
 /* Convenient loading of files. */
-static inline size coy_file_slurp(char const *filename, byte **out, MagStaticArena *arena);   
+static inline size coy_file_slurp(char const *filename, byte **out, MagAllocator *alloc);   
 static inline ElkStr coy_file_slurp_text_static(char const *filename, MagStaticArena *arena);
 static inline ElkStr coy_file_slurp_text_dyn(char const *filename, MagDynArena *arena);
 static inline ElkStr coy_file_slurp_text_allocator(char const *filename, MagAllocator *alloc);
@@ -108,6 +109,7 @@ static inline void coy_file_writer_close(CoyFileWriter *file);     /* Must set v
 
 static inline size coy_file_write(CoyFileWriter *file, size nbytes_write, byte const *buffer); /* return nbytes written or -1 on error */
 static inline b32 coy_file_write_f64(CoyFileWriter *file, f64 val);
+static inline b32 coy_file_write_f32(CoyFileWriter *file, f32 val);
 static inline b32 coy_file_write_i8(CoyFileWriter *file, i8 val);
 static inline b32 coy_file_write_i16(CoyFileWriter *file, i16 val);
 static inline b32 coy_file_write_i32(CoyFileWriter *file, i32 val);
@@ -129,7 +131,6 @@ typedef struct
 static inline CoyMemMappedFile coy_memmap_read_only(char const *filename);
 static inline void coy_memmap_close(CoyMemMappedFile *file);
 
-                                                                                            
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                File System Interactions
  *---------------------------------------------------------------------------------------------------------------------------
@@ -251,8 +252,8 @@ static inline void coy_channel_wait_until_ready_to_receive(CoyChannel *chan);
 static inline void coy_channel_wait_until_ready_to_send(CoyChannel *chan);
 static inline void coy_channel_register_sender(CoyChannel *chan);   /* Call from thread that created channel, not the one using it. */
 static inline void coy_channel_register_receiver(CoyChannel *chan); /* Call from thread that created channel, not the one using it. */
-static inline void coy_channel_done_sending(CoyChannel *chan);      /* Call from the channel using the channel.                     */
-static inline void coy_channel_done_receiving(CoyChannel *chan);    /* Call from the channel using the channel.                     */
+static inline void coy_channel_done_sending(CoyChannel *chan);      /* Call from the thread using the channel.                      */
+static inline void coy_channel_done_receiving(CoyChannel *chan);    /* Call from the thread using the channel.                      */
 static inline b32 coy_channel_send(CoyChannel *chan, void *data);
 static inline b32 coy_channel_receive(CoyChannel *chan, void **out);
 
@@ -430,6 +431,14 @@ coy_file_write_f64(CoyFileWriter *file, f64 val)
 }
 
 static inline b32 
+coy_file_write_f32(CoyFileWriter *file, f32 val)
+{
+    size nbytes = coy_file_write(file, sizeof(val), (byte *)&val);
+    if(nbytes != sizeof(val)) { return false; }
+    return true;
+}
+
+static inline b32 
 coy_file_write_i8(CoyFileWriter *file, i8 val)
 {
     size nbytes = coy_file_write(file, sizeof(val), (byte *)&val);
@@ -509,6 +518,14 @@ coy_file_write_str(CoyFileWriter *file, size len, char *str)
 
 static inline b32 
 coy_file_read_f64(CoyFileReader *file, f64 *val)
+{
+    size nbytes = coy_file_read(file, sizeof(*val), (byte *)val);
+    if(nbytes != sizeof(*val)) { return false; }
+    return true;
+}
+
+static inline b32 
+coy_file_read_f32(CoyFileReader *file, f32 *val)
 {
     size nbytes = coy_file_read(file, sizeof(*val), (byte *)val);
     if(nbytes != sizeof(*val)) { return false; }
@@ -1015,12 +1032,12 @@ coy_profile_end_block(CoyProfileAnchor *anchor)
 static inline size coy_file_slurp_internal(char const *filename, size buf_size, byte *buffer);
 
 static inline size 
-coy_file_slurp(char const *filename, byte **out, MagStaticArena *arena)
+coy_file_slurp(char const *filename, byte **out, MagAllocator *alloc)
 {
     size fsize = coy_file_size(filename);
     StopIf(fsize < 0, goto ERR_RETURN);
 
-    *out = mag_static_arena_nmalloc(arena, fsize, byte);
+    *out = mag_allocator_nmalloc(alloc, fsize, byte);
     StopIf(!*out, goto ERR_RETURN);
 
     size size_read = coy_file_slurp_internal(filename, fsize, *out);
