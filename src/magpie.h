@@ -90,13 +90,10 @@ static inline b32 mag_static_arena_over_allocated(MagStaticArena *arena);
  * WARNING: It is the user's responsibility to make sure that there is at least object_size * num_objects bytes in the
  * backing buffer. If that isn't true, you'll probably get a seg-fault during initialization.
  *
- * WARNING: Object_size must be a multiple of sizeof(void*) to ensure the buffer is aligned to hold pointers also. That also
- * means object_size must be at least sizeof(void*).
+ * WARNING: Object_size must be a multiple of sizeof(void*) to ensure the buffer is aligned to hold pointers also.
  *
  * WARNING: It is the user's responsibility to make sure the buffer is correctly aligned for the type of objects they will
- * be storing in it. This isn't a concern if the memory came from malloc() et al as they return memory with the most
- * pessimistic alignment. However, if using a stack allocated or static memory section, you should use an _Alignas to force
- * the alignment.
+ * be storing in it. If using a stack allocated or static memory section, you should use an _Alignas to force the alignment.
  */
 typedef struct 
 {
@@ -134,24 +131,11 @@ typedef struct
     void *prev_ptr;
     size prev_offset;
 
-    b32 is_borrowed;
-    union
-    {
-        struct
-        {
-            size num_blocks;
-            size max_total_bytes;
-        };
-        struct
-        {
-            size *num_blocks_ptr;
-            size *max_total_bytes_ptr;
-        };
-    };
+    size num_blocks;
+    size max_total_bytes;
 } MagDynArena;
 
 static inline MagDynArena mag_dyn_arena_create(size default_block_size);
-static inline MagDynArena mag_dyn_arena_borrow(MagDynArena *arena);
 static inline void mag_dyn_arena_destroy(MagDynArena *arena);
 static inline void mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce); /* Coalesce, keep the same size but in single block, else frees all excess blocks. */
 static inline void mag_dyn_arena_reset_default(MagDynArena *arena);       /* Assumes Coalesce is true.                                                       */
@@ -237,7 +221,6 @@ static inline void mag_allocator_free(MagAllocator *alloc, void *ptr);
 
 #define eco_borrow(alloc)                        _Generic((alloc),                                                          \
                                                      MagStaticArena *: mag_static_arena_borrow,                             \
-                                                     MagDynArena *:    mag_dyn_arena_borrow,                                \
                                                      MagAllocator *:   mag_allocator_borrow                                 \
                                                  )(alloc)
 
@@ -634,7 +617,6 @@ mag_dyn_arena_create(size default_block_size)
         return arena;
     }
 
-    arena.is_borrowed = false;
     arena.head_block = block;
     arena.num_blocks = 1;
     arena.max_total_bytes = block->buf.size;
@@ -647,36 +629,18 @@ mag_dyn_arena_create(size default_block_size)
     return arena;
 }
 
-static inline MagDynArena 
-mag_dyn_arena_borrow(MagDynArena *arena)
-{
-    MagDynArena borrowed = *arena;
-
-    if(!borrowed.is_borrowed)
-    {
-        borrowed.is_borrowed = true;
-        borrowed.num_blocks_ptr = &arena->num_blocks;
-        borrowed.max_total_bytes_ptr = &arena->max_total_bytes;
-    }
-
-    return borrowed;
-}
-
 static inline void mag_dyn_arena_destroy(MagDynArena *arena)
 {
-    if(!arena->is_borrowed)
+    /* Iterate through linked list and free all the blocks. */
+    MagDynArenaBlock *curr = arena->head_block;
+    while(curr)
     {
-        /* Iterate through linked list and free all the blocks. */
-        MagDynArenaBlock *curr = arena->head_block;
-        while(curr)
-        {
-            MagDynArenaBlock *next = curr->next;
-            mag_sys_memory_free(&curr->buf);
-            curr = next;
-        }
-
-        *arena = (MagDynArena){0};
+        MagDynArenaBlock *next = curr->next;
+        mag_sys_memory_free(&curr->buf);
+        curr = next;
     }
+
+    *arena = (MagDynArena){0};
 
     return;
 }
@@ -684,8 +648,6 @@ static inline void mag_dyn_arena_destroy(MagDynArena *arena)
 static inline void 
 mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
 {
-    Assert(!arena->is_borrowed);
-
     /* Only actually do the coalesce if we need to. */
     b32 do_coalesce = coalesce && arena->max_total_bytes > arena->default_block_size;
 
@@ -764,17 +726,8 @@ mag_dyn_arena_add_block(MagDynArena *arena, size min_bytes)
         }
 
         curr->next = block;
-
-        if(arena->is_borrowed)
-        {
-            *arena->num_blocks_ptr += 1;
-            *arena->max_total_bytes_ptr += block->buf.size;
-        }
-        else
-        {
-            arena->num_blocks += 1;
-            arena->max_total_bytes += block->buf.size;
-        }
+        arena->num_blocks += 1;
+        arena->max_total_bytes += block->buf.size;
     }
 
     return block;
@@ -896,7 +849,6 @@ mag_allocator_borrow(MagAllocator *alloc)
     switch(alloc->type)
     {
         case MAG_ALLOC_T_STATIC_ARENA: borrowed.static_arena = mag_static_arena_borrow(&alloc->static_arena); break;
-        case MAG_ALLOC_T_DYN_ARENA:    borrowed.dyn_arena    = mag_dyn_arena_borrow(&alloc->dyn_arena);       break;
         default: { Panic(); }
     }
 
