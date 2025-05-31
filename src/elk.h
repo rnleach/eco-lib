@@ -394,8 +394,8 @@ static inline ElkStr elk_csv_simple_unquote_str(ElkStr str);
 
 /* This random number generator is a counter based generator.
  *
- * Different versions can be used in different threads with keys or if each thread increments by the counter by the number
- * of threads they can use the same key.
+ * Different versions can be used in different threads with different keys, or if each thread increments the counter by the
+ * number of threads they can use the same key.
  *
  * Philox and Threefish were some of the original design ideas for the counter based PRNGs, but this one is based on an
  * algorithm by Bernard Widynski. The paper for the algorithm can be found at https://arxiv.org/abs/2004.06278.
