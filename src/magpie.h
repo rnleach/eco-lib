@@ -169,8 +169,8 @@ typedef struct
 
 static inline MagAllocator mag_allocator_dyn_arena_create(size default_block_size);
 static inline MagAllocator mag_allocator_static_arena_create(size buf_size, byte buffer[]);
-static inline MagAllocator mag_allocator_from_dyn_arena(MagDynArena arena);
-static inline MagAllocator mag_allocator_from_static_arena(MagStaticArena arena);
+static inline MagAllocator mag_allocator_from_dyn_arena(MagDynArena arena);       /* Takes ownership of arena. */
+static inline MagAllocator mag_allocator_from_static_arena(MagStaticArena arena); /* Takes ownership of arena. */
 static inline MagAllocator mag_allocator_borrow(MagAllocator *alloc);
 
 static inline void mag_allocator_destroy(MagAllocator *arena);
