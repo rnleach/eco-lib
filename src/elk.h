@@ -2019,7 +2019,7 @@ elk_random_state_create(u64 seed)
         0xe5a6d9f43f894ae7, 0xb43ade654e9d7a65, 0xe1bfd9376b9f78c1, 0x48bfe25dcb92a73f
     };
 
-    u64 key = keys[seed % (sizeof(keys)/sizeof(keys[0]))];
+    u64 key = keys[seed % ECO_ARRAY_SIZE(keys) ];
 
     return (ElkRandomState){ .key = key, .counter = seed };
 }
