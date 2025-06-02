@@ -352,7 +352,12 @@ mag_static_arena_destroy(MagStaticArena *arena)
 #ifdef _MAG_TRACK_MEM_USAGE
     Assert(!arena->is_borrowed);
 #endif
+    MagMemoryBlock mem = arena->buf;
     *arena = (MagStaticArena){0};
+    if(MAG_MEM_IS_OWNED(mem))
+    {
+        mag_sys_memory_free(&mem);
+    }
     return;
 }
 
