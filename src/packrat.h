@@ -132,6 +132,27 @@ static inline void pak_array_ledger_reset(PakArrayLedger *array);
 static inline void pak_array_ledger_set_capacity(PakArrayLedger *array, size capacity);
 
 /*---------------------------------------------------------------------------------------------------------------------------
+ *                                                      Stack Ledger
+ *---------------------------------------------------------------------------------------------------------------------------
+ *
+ * Mind the PAK_COLLECTION_FULL and PAK_COLLECTION_EMPTY return values.
+ */
+typedef struct 
+{
+    size capacity;
+    size length;
+} PakStackLedger;
+
+static inline PakStackLedger pak_stack_ledger_create(size capacity);
+static inline b32 pak_stack_ledger_full(PakStackLedger *stack);
+static inline b32 pak_stack_ledger_empty(PakStackLedger *stack);
+static inline size pak_stack_ledger_push_index(PakStackLedger *stack);
+static inline size pak_stack_ledger_pop_index(PakStackLedger *stack);
+static inline size pak_stack_ledger_len(PakStackLedger const *stack);
+static inline void pak_stack_ledger_reset(PakStackLedger *stack);
+static inline void pak_stack_ledger_set_capacity(PakStackLedger *stack, size capacity);
+
+/*---------------------------------------------------------------------------------------------------------------------------
  *                                         
  *                                                  Unordered Collections
  *
@@ -575,6 +596,66 @@ pak_array_ledger_set_capacity(PakArrayLedger *array, size capacity)
 {
     Assert(capacity > 0);
     array->capacity = capacity;
+}
+
+static inline PakStackLedger 
+pak_stack_ledger_create(size capacity)
+{
+    Assert(capacity > 0);
+    return (PakStackLedger)
+    {
+        .capacity = capacity,
+        .length = 0
+    };
+}
+
+static inline b32 
+pak_stack_ledger_full(PakStackLedger *stack)
+{
+    return stack->length == stack->capacity;
+}
+
+static inline b32 
+pak_stack_ledger_empty(PakStackLedger *stack)
+{
+    return stack->length == 0;
+}
+
+static inline size 
+pak_stack_ledger_push_index(PakStackLedger *stack)
+{
+    if(pak_stack_ledger_full(stack)) { return PAK_COLLECTION_FULL; }
+
+    size idx = stack->length;
+    stack->length += 1;
+    return idx;
+}
+
+static inline size 
+pak_stack_ledger_pop_index(PakStackLedger *stack)
+{
+    if(pak_stack_ledger_empty(stack)) { return PAK_COLLECTION_EMPTY; }
+
+    return --stack->length;
+}
+
+static inline size 
+pak_stack_ledger_len(PakStackLedger const *stack)
+{
+    return stack->length;
+}
+
+static inline void 
+pak_stack_ledger_reset(PakStackLedger *stack)
+{
+    stack->length = 0;
+}
+
+static inline void 
+pak_stack_ledger_set_capacity(PakStackLedger *stack, size capacity)
+{
+    Assert(capacity > 0);
+    stack->capacity = capacity;
 }
 
 static PakHashMap 
