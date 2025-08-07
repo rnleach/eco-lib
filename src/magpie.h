@@ -99,9 +99,6 @@ typedef struct
     void *prev_ptr;
     size prev_offset;
 
-    b32 borrowed;
-    MagDynArenaBlock *borrowed_head;
-
 #ifdef _MAG_TRACK_MEM_USAGE
     b32 failed_allocation;
 #endif
