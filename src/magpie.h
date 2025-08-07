@@ -99,8 +99,8 @@ typedef struct
     void *prev_ptr;
     size prev_offset;
 
-    size num_blocks;
-    size max_total_bytes;
+    b32 borrowed;
+    MagDynArenaBlock *borrowed_head;
 
 #ifdef _MAG_TRACK_MEM_USAGE
     b32 failed_allocation;
@@ -588,8 +588,6 @@ mag_dyn_arena_create(size default_block_size)
     }
 
     arena.head_block = block;
-    arena.num_blocks = 1;
-    arena.max_total_bytes = block->buf.size;
     arena.default_block_size = default_block_size;
 
     arena.prev_offset = 0;
@@ -621,8 +619,8 @@ static inline void mag_dyn_arena_destroy(MagDynArena *arena)
 static inline void 
 mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
 {
-    /* Only actually do the coalesce if we need to. */
-    b32 do_coalesce = coalesce && arena->max_total_bytes > arena->default_block_size;
+    /* Only actually do the coalesce if there is more than 1 block. */
+    b32 do_coalesce = coalesce && !!arena->head_block->next;
 
     MagDynArenaBlock *curr = NULL;
     if(do_coalesce)
@@ -643,33 +641,39 @@ mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
         arena->head_block->next = NULL; /* Make sure the linked list is properly terminated. */
     }
 
+    /* Create a new head block if necesssary. */
+    if(do_coalesce)
+    {
+        /* Calculate how large to make the coalesced block. */
+        size max_total_bytes = arena->head_block->buf_offset;
+        MagDynArenaBlock *next = arena->head_block->next;
+        while(next)
+        {
+            max_total_bytes += next->buf_offset;
+            next = next->next;
+        }
+
+        /* Create a block large enough to hold ALL the data from last time in a single block. */
+        MagDynArenaBlock *block = mag_dyn_arena_block_create(max_total_bytes);
+        if(!block)
+        {
+            *arena = (MagDynArena){0};
+            return;
+        }
+
+        arena->head_block = block;
+        /* arena->default_block_size = ...doesn't need changed; */
+
+        arena->prev_offset = 0;
+        arena->prev_ptr = block;
+    }
+
     /* Free the unneeded blocks. */
     while(curr)
     {
         MagDynArenaBlock *next = curr->next;
         mag_sys_memory_free(&curr->buf);
         curr = next;
-    }
-
-    /* Create a new head block if necesssary. */
-    if(do_coalesce)
-    {
-        /* Create a block large enough to hold ALL the data from last time in a single block. */
-        MagDynArenaBlock *block = mag_dyn_arena_block_create(arena->max_total_bytes);
-        if(!block)
-        {
-            /* Not sure how this is possible because we JUST freed up this much memory! */
-            *arena = (MagDynArena){0};
-            return;
-        }
-
-        arena->head_block = block;
-        arena->num_blocks = 1;
-        arena->max_total_bytes = block->buf.size;
-        /* arena->default_block_size = ...doesn't need changed; */
-
-        arena->prev_offset = 0;
-        arena->prev_ptr = block;
     }
 
     return;
@@ -690,8 +694,6 @@ mag_dyn_arena_add_block(MagDynArena *arena, size min_bytes)
     {
         block->next = arena->head_block;
         arena->head_block = block;
-        arena->num_blocks += 1;
-        arena->max_total_bytes += block->buf.size;
     }
 
     return block;
