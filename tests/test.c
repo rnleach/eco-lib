@@ -26,8 +26,8 @@ main(int argc, char *argv[])
     fprintf(stderr, ".complete.\n");
 
     /* Magpie Tests -----------------------------------------------------------------------------*/
-    fprintf(stderr, "magpie_sys_memory_tests()..");
-    ap = COY_START_PROFILE_BLOCK("magpie sys_memory_tests");
+    fprintf(stderr, "magpie memory tests..");
+    ap = COY_START_PROFILE_BLOCK("magpie tests");
     magpie_sys_memory_tests();
     magpie_arena_tests();
     magpie_pool_tests();
