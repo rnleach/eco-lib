@@ -784,8 +784,12 @@ mag_dyn_arena_realloc(MagDynArena *arena, void *ptr, size num_bytes, size alignm
         }
     }
 
+    /* Get the previous allocation size, or at least a ceiling for it. */
+    size prev_alloc_size_ceiling = arena->head_block->buf_offset + (uptr)arena->head_block->buf.mem - (uptr)ptr; 
+    prev_alloc_size_ceiling = prev_alloc_size_ceiling < num_bytes ? prev_alloc_size_ceiling : num_bytes;
+
     void *new = mag_dyn_arena_alloc(arena, num_bytes, alignment);
-    if(new) { memcpy(new, ptr, num_bytes); }
+    if(new) { memcpy(new, ptr, prev_alloc_size_ceiling); }
 
     /* Failed allocations are tracked in mag_dyn_arena_alloc */
 
