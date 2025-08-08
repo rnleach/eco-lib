@@ -9,8 +9,6 @@
 #    undef NDEBUG
 #endif
 
-#define _MAG_TRACK_MEM_USAGE
-
 #include <stdio.h>
 #include "../build/elk.h"
 #include "../build/magpie.h"

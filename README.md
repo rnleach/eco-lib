@@ -69,6 +69,7 @@ This really has nothing to do with computers or software, but I thought the loos
  - Provide a cross platform (Windows, Linux, Mac) layer for getting memory from the OS to bypass malloc/free.
  - Create a variety of allocators that spans from simple and fast to more complicated and general so I can choose the best allocator for any specific task.
  - Build static (pre-determined size) and dynamic (unbounded) allocators.
+ - Track memory usage and make metrics available so I can potentially tune allocation block sizes for better performance in my applications.
 
 ### Non-goals
  - Create every allocator I *might eventually* need. I only build what I need, so if it's in there, I've used it.

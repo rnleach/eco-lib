@@ -52,7 +52,7 @@ static char test_chars[18] =
 static f64 test_f64[6] = { 0.0, 1.0, 2.17, 3.14159, 9.81, 1.6666 };
 
 static void
-test_arena(void)
+test_static_arena(void)
 {
     byte arena_buffer[ECO_KB(1)] = {0};
     MagStaticArena arena_i = mag_static_arena_create(sizeof(arena_buffer), arena_buffer);
@@ -101,13 +101,11 @@ test_arena(void)
         mag_static_arena_reset(arena);
     }
 
-#ifdef _MAG_TRACK_MEM_USAGE
     f64 pct_mem = mag_static_arena_max_ratio(arena) * 100.0;
     b32 over_allocated = mag_static_arena_over_allocated(arena);
 
     Assert(!over_allocated);
     Assert(pct_mem < 100.0);
-#endif
 
     mag_static_arena_destroy(arena);
 }
@@ -161,13 +159,11 @@ test_dynamic_arena(void)
         mag_dyn_arena_reset(arena, false);
     }
 
-#ifdef _MAG_TRACK_MEM_USAGE
     f64 pct_mem = mag_dyn_arena_max_ratio(arena) * 100.0;
     b32 over_allocated = mag_dyn_arena_over_allocated(arena);
 
     Assert(!over_allocated);
     Assert(pct_mem < 100.0);
-#endif
 
     mag_dyn_arena_destroy(arena);
 }
@@ -179,10 +175,7 @@ test_static_arena_realloc(void)
     MagStaticArena arena_instance = mag_static_arena_create(sizeof(buffer), buffer);
     MagStaticArena *arena = &arena_instance;
 
-    MagStaticArena borrowed_instance = mag_static_arena_borrow(arena);
-    MagStaticArena *borrowed = &borrowed_instance;
-
-    f64 *ten_dubs = mag_static_arena_nmalloc(borrowed, 10, f64);
+    f64 *ten_dubs = mag_static_arena_nmalloc(arena, 10, f64);
     Assert(ten_dubs);
 
     for(i32 i = 0; i < 10; ++i)
@@ -190,7 +183,7 @@ test_static_arena_realloc(void)
         ten_dubs[i] = (f64)i;
     }
 
-    f64 *hundred_dubs = mag_static_arena_nrealloc(borrowed, ten_dubs, 100, f64);
+    f64 *hundred_dubs = mag_static_arena_nrealloc(arena, ten_dubs, 100, f64);
 
     Assert(hundred_dubs);
     Assert(hundred_dubs == ten_dubs);
@@ -210,17 +203,14 @@ test_static_arena_realloc(void)
         Assert(hundred_dubs[i] == (f64)i);
     }
 
-    f64 *million_dubs = mag_static_arena_nrealloc(borrowed, hundred_dubs, 1000000, f64);
+    f64 *million_dubs = mag_static_arena_nrealloc(arena, hundred_dubs, 1000000, f64);
     Assert(!million_dubs);
 
-
-#ifdef _MAG_TRACK_MEM_USAGE
     f64 pct_mem = mag_static_arena_max_ratio(arena) * 100.0;
     b32 over_allocated = mag_static_arena_over_allocated(arena);
 
     Assert(over_allocated);
     Assert(pct_mem == 100.0);
-#endif
 
     mag_static_arena_destroy(arena);
 }
@@ -231,14 +221,7 @@ test_dynamic_arena_realloc(void)
     MagDynArena arena_instance = mag_dyn_arena_create(100 * sizeof(f64));
     MagDynArena *arena = &arena_instance;
 
-#if 0
-    MagDynArena borrowed_instance = mag_dyn_arena_borrow(arena);
-    MagDynArena *borrowed = &borrowed_instance;
-#else
-    MagDynArena *borrowed = arena;
-#endif
-
-    f64 *ten_dubs = mag_dyn_arena_nmalloc(borrowed, 10, f64);
+    f64 *ten_dubs = mag_dyn_arena_nmalloc(arena, 10, f64);
     Assert(ten_dubs);
 
     for(i32 i = 0; i < 10; ++i)
@@ -246,7 +229,7 @@ test_dynamic_arena_realloc(void)
         ten_dubs[i] = (f64)i;
     }
 
-    f64 *hundred_dubs = mag_dyn_arena_nrealloc(borrowed, ten_dubs, 100, f64);
+    f64 *hundred_dubs = mag_dyn_arena_nrealloc(arena, ten_dubs, 100, f64);
 
     Assert(hundred_dubs);
     Assert(hundred_dubs == ten_dubs);
@@ -266,7 +249,7 @@ test_dynamic_arena_realloc(void)
         Assert(hundred_dubs[i] == (f64)i);
     }
 
-    f64 *million_dubs = mag_dyn_arena_nrealloc(borrowed, hundred_dubs, 1000000, f64);
+    f64 *million_dubs = mag_dyn_arena_nrealloc(arena, hundred_dubs, 1000000, f64);
     Assert(million_dubs);
     Assert(million_dubs != hundred_dubs);
 
@@ -285,13 +268,11 @@ test_dynamic_arena_realloc(void)
         Assert(million_dubs[i] == (f64)i);
     }
 
-#ifdef _MAG_TRACK_MEM_USAGE
     f64 pct_mem = mag_dyn_arena_max_ratio(arena) * 100.0;
     b32 over_allocated = mag_dyn_arena_over_allocated(arena);
 
     Assert(!over_allocated);
     Assert(pct_mem > 100.0);
-#endif
 
     mag_dyn_arena_destroy(arena);
 }
@@ -326,14 +307,11 @@ test_static_arena_free(void)
     Assert(offset_before != offset_after);
     Assert(offset_before < offset_after);
 
-
-#ifdef _MAG_TRACK_MEM_USAGE
     f64 pct_mem = mag_static_arena_max_ratio(arena) * 100.0;
     b32 over_allocated = mag_static_arena_over_allocated(arena);
 
     Assert(!over_allocated);
     Assert(pct_mem <= 100.0);
-#endif
 
     mag_static_arena_destroy(arena);
 }
@@ -368,15 +346,71 @@ test_dyn_arena_free(void)
     Assert(offset_before < offset_after);
 
 
-#ifdef _MAG_TRACK_MEM_USAGE
     f64 pct_mem = mag_dyn_arena_max_ratio(arena) * 100.0;
     b32 over_allocated = mag_dyn_arena_over_allocated(arena);
 
     Assert(!over_allocated);
     Assert(pct_mem <= 100.0);
-#endif
 
     mag_dyn_arena_destroy(arena);
+}
+
+static void
+test_static_arena_save_point(void)
+{
+    _Alignas(_Alignof(f64)) byte buffer[100 * sizeof(f64)];
+    MagStaticArena arena_instance = mag_static_arena_create(sizeof(buffer), buffer);
+    MagStaticArena *arena = &arena_instance;
+
+    MagStaticArenaSavePoint sp = mag_static_arena_create_save_point(arena);
+
+    f64 *ten_dubs = mag_static_arena_nmalloc(arena, 10, f64);
+    Assert(ten_dubs);
+
+    for(i32 i = 0; i < 10; ++i)
+    {
+        ten_dubs[i] = (f64)i;
+    }
+
+    f64 *hundred_dubs = mag_static_arena_nrealloc(arena, ten_dubs, 100, f64);
+
+    Assert(hundred_dubs);
+    Assert(hundred_dubs == ten_dubs);
+
+    for(i32 i = 0; i < 10; ++i)
+    {
+        Assert(hundred_dubs[i] == (f64)i);
+    }
+
+    for(i32 i = 10; i < 100; ++i)
+    {
+        hundred_dubs[i] = (f64)i;
+    }
+
+    for(i32 i = 10; i < 100; ++i)
+    {
+        Assert(hundred_dubs[i] == (f64)i);
+    }
+
+    f64 *million_dubs = mag_static_arena_nrealloc(arena, hundred_dubs, 1000000, f64);
+    Assert(!million_dubs);
+
+    f64 pct_mem = mag_static_arena_max_ratio(arena) * 100.0;
+    b32 over_allocated = mag_static_arena_over_allocated(arena);
+
+    Assert(over_allocated);
+    Assert(pct_mem == 100.0);
+
+    mag_static_arena_restore_save_point(&sp);
+
+    pct_mem = mag_static_arena_max_ratio(arena) * 100.0;
+    over_allocated = mag_static_arena_over_allocated(arena);
+
+    Assert(over_allocated);
+    Assert(pct_mem == 100.0);
+    Assert(arena->buf_offset == 0); /* This is what it should have been when we saved it. */
+
+    mag_static_arena_destroy(arena);
 }
 
 /*---------------------------------------------------------------------------------------------------------------------------
@@ -385,9 +419,10 @@ test_dyn_arena_free(void)
 void
 magpie_arena_tests(void)
 {
-    test_arena();
+    test_static_arena();
     test_static_arena_realloc();
     test_static_arena_free();
+    test_static_arena_save_point();
 
     test_dynamic_arena();
     test_dynamic_arena_realloc();

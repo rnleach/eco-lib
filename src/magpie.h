@@ -33,59 +33,60 @@ static inline MagMemoryBlock mag_wrap_memory(size buf_size, void *buffer);
  *                                                 Static Arena Allocator
  *---------------------------------------------------------------------------------------------------------------------------
  *
- * Compile with -D_MAG_TRACK_MEM_USAGE to include the maximum memory tracking variables & features.
- *
  * A statically sized, non-growable arena allocator that works on top of a user supplied buffer.
+ *
+ * Always use a pointer to the arena to collect the correct usage statistics. Utilize a save-point if you want to pass it
+ * in to a temporary function and then restore to the save point when you get it back.
  */
 
 typedef struct 
 {
     MagMemoryBlock buf;
     size buf_offset;
+
+    /* Keep track of the previous allocation for realloc and free. */
     void *prev_ptr;
     size prev_offset;
-#ifdef _MAG_TRACK_MEM_USAGE
-    b32 is_borrowed;
-    union
-    {
-        struct
-        {
-            size max_offset;
-            b32 failed_allocation;
-        };
-        struct
-        {
-            size *max_offset_ptr;
-            b32 *failed_allocation_ptr;
-        };
-    };
-#endif
+
+    size max_offset;
+    b32 failed_allocation;
 } MagStaticArena;
+
+typedef struct
+{
+    MagStaticArena *origin;
+    size buf_offset;
+    void *prev_ptr;
+    size prev_offset;
+} MagStaticArenaSavePoint;
 
 static inline MagStaticArena mag_static_arena_create(size buf_size, byte buffer[]);
 static inline MagStaticArena mag_static_arena_allocate_and_create(size num_bytes);
-static inline MagStaticArena mag_static_arena_borrow(MagStaticArena *arena);                                /* Creates a borrowed version where all new allocations can eventually be overwritten by the original. */
 static inline void mag_static_arena_destroy(MagStaticArena *arena);
 static inline void mag_static_arena_reset(MagStaticArena *arena);                                           /* Set offset to 0, invalidates all previous allocations */
 static inline void *mag_static_arena_alloc(MagStaticArena *arena, size num_bytes, size alignment);          /* ret NULL if out of memory (OOM)                       */
 static inline void *mag_static_arena_realloc(MagStaticArena *arena, void *ptr, size asize, size alignment); /* ret NULL if ptr is not most recent allocation         */
 static inline void mag_static_arena_free(MagStaticArena *arena, void *ptr);                                 /* Undo if it was last allocation, otherwise no-op       */
 
+static inline MagStaticArenaSavePoint mag_static_arena_create_save_point(MagStaticArena *arena);
+static inline void mag_static_arena_restore_save_point(MagStaticArenaSavePoint *save_point);
+
 /* Also see eco_arena_malloc and related macros below. */
 #define mag_static_arena_malloc(arena, type) (type *)mag_static_arena_alloc((arena), sizeof(type), _Alignof(type))
 #define mag_static_arena_nmalloc(arena, count, type) (type *)mag_static_arena_alloc((arena), (count) * sizeof(type), _Alignof(type))
 #define mag_static_arena_nrealloc(arena, ptr, count, type) (type *) mag_static_arena_realloc((arena), (ptr), sizeof(type) * (count), _Alignof(type))
 
-#ifdef _MAG_TRACK_MEM_USAGE
 static inline f64 mag_static_arena_max_ratio(MagStaticArena *arena);
 static inline b32 mag_static_arena_over_allocated(MagStaticArena *arena);
-#endif
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                Dynamic Arena Allocator
  *---------------------------------------------------------------------------------------------------------------------------
  *
  * A dynamically growable arena allocator that works with the system allocator to grow indefinitely.
+ *
+ * Always use a pointer to the arena to collect the correct usage statistics. Utilize a save-point if you want to pass it
+ * in to a temporary function and then restore to the save point when you get it back.
  */
 
 /* A dynamically size arena. */
@@ -95,15 +96,28 @@ typedef struct
     MagDynArenaBlock *head_block;
     size default_block_size;
 
-    /* Keep track of the previous allocation for realloc. */
+    /* Keep track of the previous allocation for realloc and free. */
     void *prev_ptr;
     size prev_offset;
 
-#ifdef _MAG_TRACK_MEM_USAGE
+    /* Extra blocks from restoring save points. */
+    MagDynArenaBlock *orphaned_blocks_head;
+
     b32 failed_allocation;
-#endif
+    size max_total_allocations; /* Update during reset, save-point restore, and when directly queried.  */
 
 } MagDynArena;
+
+typedef struct
+{
+    MagDynArena *origin;
+
+    MagDynArenaBlock *head;
+    size block_buf_offset;
+
+    void *prev_ptr;
+    size prev_offset;
+} MagDynArenaSavePoint;
 
 static inline MagDynArena mag_dyn_arena_create(size default_block_size);
 static inline void mag_dyn_arena_destroy(MagDynArena *arena);
@@ -113,14 +127,15 @@ static inline void *mag_dyn_arena_alloc(MagDynArena *arena, size num_bytes, size
 static inline void *mag_dyn_arena_realloc(MagDynArena *arena, void *ptr, size num_bytes, size alignment);
 static inline void mag_dyn_arena_free(MagDynArena *arena, void *ptr);
 
-#ifdef _MAG_TRACK_MEM_USAGE
-static inline f64 mag_dyn_arena_max_ratio(MagDynArena *arena);
-static inline b32 mag_dyn_arena_over_allocated(MagDynArena *arena);
-#endif
+static inline MagDynArenaSavePoint mag_dyn_arena_create_save_point(MagDynArena *arena);
+static inline void mag_dyn_arena_restore_save_point(MagDynArenaSavePoint *save_point);
 
 #define mag_dyn_arena_malloc(arena, type)               (type *)mag_dyn_arena_alloc((arena),           sizeof(type),           _Alignof(type))
 #define mag_dyn_arena_nmalloc(arena, count, type)       (type *)mag_dyn_arena_alloc((arena), (count) * sizeof(type),           _Alignof(type))
 #define mag_dyn_arena_nrealloc(arena, ptr, count, type) (type *)mag_dyn_arena_realloc((arena), (ptr),  sizeof(type) * (count), _Alignof(type))
+
+static inline f64 mag_dyn_arena_max_ratio(MagDynArena *arena);
+static inline b32 mag_dyn_arena_over_allocated(MagDynArena *arena);
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                  Static Pool Allocator
@@ -172,12 +187,20 @@ typedef struct
     };
 } MagAllocator;
 
+typedef struct
+{
+    MagAllocatorType type;
+    union
+    {
+        MagStaticArenaSavePoint static_sp;
+        MagDynArenaSavePoint dyn_sp;
+    };
+} MagAllocatorSavePoint;
 
 static inline MagAllocator mag_allocator_dyn_arena_create(size default_block_size);
 static inline MagAllocator mag_allocator_static_arena_create(size buf_size, byte buffer[]);
 static inline MagAllocator mag_allocator_from_dyn_arena(MagDynArena arena);       /* Takes ownership of arena. */
 static inline MagAllocator mag_allocator_from_static_arena(MagStaticArena arena); /* Takes ownership of arena. */
-static inline MagAllocator mag_allocator_borrow(MagAllocator *alloc);
 
 static inline void mag_allocator_destroy(MagAllocator *arena);
 static inline void mag_allocator_reset(MagAllocator *arena); /* Clear all previous allocations. */
@@ -185,71 +208,69 @@ static inline void *mag_allocator_alloc(MagAllocator *alloc, size num_bytes, siz
 static inline void *mag_allocator_realloc(MagAllocator *alloc, void *ptr, size num_bytes, size alignment);
 static inline void mag_allocator_free(MagAllocator *alloc, void *ptr);
 
-#ifdef _MAG_TRACK_MEM_USAGE
-static inline f64 mag_allocator_max_ratio(MagAllocator *alloc);
-static inline b32 mag_allocator_over_allocated(MagAllocator *alloc);
-#endif
+static inline MagAllocatorSavePoint mag_allocator_create_save_point(MagAllocator *alloc);
+static inline void mag_allocator_restore_save_point(MagAllocatorSavePoint *save_point);
 
 #define mag_allocator_malloc(arena, type)              (type *)mag_allocator_alloc((arena),           sizeof(type),           _Alignof(type))
 #define mag_allocator_nmalloc(arena, count, type)      (type *)mag_allocator_alloc((arena), (count) * sizeof(type),           _Alignof(type))
 #define mag_allocator_nrealloc(arena, ptr, count, type)(type *)mag_allocator_realloc((arena), (ptr),  sizeof(type) * (count), _Alignof(type))
 
-#define eco_malloc(alloc, type) (type *)         _Generic((alloc),                                                          \
-                                                     MagStaticArena *: mag_static_arena_alloc,                              \
-                                                     MagDynArena *:    mag_dyn_arena_alloc,                                 \
-                                                     MagAllocator *:   mag_allocator_alloc                                  \
-                                                 )(alloc, sizeof(type), _Alignof(type))
+static inline f64 mag_allocator_max_ratio(MagAllocator *alloc);
+static inline b32 mag_allocator_over_allocated(MagAllocator *alloc);
 
-#define eco_nmalloc(alloc, count, type) (type *) _Generic((alloc),                                                          \
-                                                     MagStaticArena *: mag_static_arena_alloc,                              \
-                                                     MagDynArena *:    mag_dyn_arena_alloc,                                 \
-                                                     MagAllocator *:   mag_allocator_alloc                                  \
-                                                 )(alloc, (count) * sizeof(type), _Alignof(type))
+#define eco_arena_malloc(alloc, type) (type *)         _Generic((alloc),                                                    \
+                                                           MagStaticArena *: mag_static_arena_alloc,                        \
+                                                           MagDynArena *:    mag_dyn_arena_alloc,                           \
+                                                           MagAllocator *:   mag_allocator_alloc                            \
+                                                       )(alloc, sizeof(type), _Alignof(type))
 
-#define eco_nrealloc(alloc, ptr, count, type)    _Generic((alloc),                                                          \
-                                                      MagStaticArena *: mag_static_arena_realloc,                           \
-                                                      MagDynArena *:    mag_dyn_arena_realloc,                              \
-                                                      MagAllocator *:   mag_allocator_realloc                               \
-                                                 )(alloc, ptr, sizeof(type) * (count), _Alignof(type))
+#define eco_arena_nmalloc(alloc, count, type) (type *) _Generic((alloc),                                                    \
+                                                           MagStaticArena *: mag_static_arena_alloc,                        \
+                                                           MagDynArena *:    mag_dyn_arena_alloc,                           \
+                                                           MagAllocator *:   mag_allocator_alloc                            \
+                                                       )(alloc, (count) * sizeof(type), _Alignof(type))
 
-#define eco_destroy(alloc)                       _Generic((alloc),                                                          \
-                                                     MagStaticArena *: mag_static_arena_destroy,                            \
-                                                     MagDynArena *:    mag_dyn_arena_destroy,                               \
-                                                     MagAllocator *:   mag_allocator_destroy                                \
-                                                 )(alloc)
+#define eco_arena_nrealloc(alloc, ptr, count, type)    _Generic((alloc),                                                    \
+                                                            MagStaticArena *: mag_static_arena_realloc,                     \
+                                                            MagDynArena *:    mag_dyn_arena_realloc,                        \
+                                                            MagAllocator *:   mag_allocator_realloc                         \
+                                                       )(alloc, ptr, sizeof(type) * (count), _Alignof(type))
 
-#define eco_free(alloc, ptr)                     _Generic((alloc),                                                          \
-                                                     MagStaticArena *: mag_static_arena_free,                               \
-                                                     MagDynArena *:    mag_dyn_arena_free,                                  \
-                                                     MagAllocator *:   mag_allocator_free                                   \
-                                                 )(alloc, ptr)
+#define eco_arena_destroy(alloc)                       _Generic((alloc),                                                    \
+                                                           MagStaticArena *: mag_static_arena_destroy,                      \
+                                                           MagDynArena *:    mag_dyn_arena_destroy,                         \
+                                                           MagAllocator *:   mag_allocator_destroy                          \
+                                                       )(alloc)
 
-#define eco_reset(alloc)                         _Generic((alloc),                                                          \
-                                                     MagStaticArena *: mag_static_arena_reset,                              \
-                                                     MagDynArena *:    mag_dyn_arena_reset_default,                         \
-                                                     MagAllocator *:   mag_allocator_reset                                  \
-                                                 )(alloc)
+#define eco_arena_free(alloc, ptr)                     _Generic((alloc),                                                    \
+                                                           MagStaticArena *: mag_static_arena_free,                         \
+                                                           MagDynArena *:    mag_dyn_arena_free,                            \
+                                                           MagAllocator *:   mag_allocator_free                             \
+                                                       )(alloc, ptr)
 
-#define eco_borrow(alloc)                        _Generic((alloc),                                                          \
-                                                     MagStaticArena *: mag_static_arena_borrow,                             \
-                                                     MagAllocator *:   mag_allocator_borrow                                 \
-                                                 )(alloc)
+#define eco_arena_reset(alloc)                         _Generic((alloc),                                                    \
+                                                           MagStaticArena *: mag_static_arena_reset,                        \
+                                                           MagDynArena *:    mag_dyn_arena_reset_default,                   \
+                                                           MagAllocator *:   mag_allocator_reset                            \
+                                                       )(alloc)
 
-#ifdef _MAG_TRACK_MEM_USAGE
+#define eco_arena_create_save_point(alloc)            _Generic((alloc),                                                     \
+                                                           MagStaticArena *: mag_static_arena_create_save_point,            \
+                                                           MagDynArena *:    mag_dyn_arena_create_save_point,               \
+                                                           MagAllocator *:   mag_allocator_create_save_point                \
+                                                       )(alloc)
 
-#define eco_max_ratio(alloc)                     _Generic((alloc),                                                          \
-                                                     MagStaticArena *: mag_static_arena_max_ratio,                          \
-                                                     MagDynArena *:    mag_dyn_arena_max_ratio,                             \
-                                                     MagAllocator *:   mag_allocator_max_ratio                              \
-                                                 )(alloc)
+#define eco_arena_max_ratio(alloc)                     _Generic((alloc),                                                    \
+                                                           MagStaticArena *: mag_static_arena_max_ratio,                    \
+                                                           MagDynArena *:    mag_dyn_arena_max_ratio,                       \
+                                                           MagAllocator *:   mag_allocator_max_ratio                        \
+                                                       )(alloc)
 
-#define eco_over_allocated(alloc)                _Generic((alloc),                                                          \
-                                                     MagStaticArena *: mag_static_arena_over_allocated,                     \
-                                                     MagDynArena *:    mag_dyn_arena_over_allocated,                        \
-                                                     MagAllocator *:   mag_allocator_over_allocated                         \
-                                                 )(alloc)
-
-#endif
+#define eco_arena_over_allocated(alloc)                _Generic((alloc),                                                    \
+                                                           MagStaticArena *: mag_static_arena_over_allocated,               \
+                                                           MagDynArena *:    mag_dyn_arena_over_allocated,                  \
+                                                           MagAllocator *:   mag_allocator_over_allocated                   \
+                                                       )(alloc)
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                      String Slice
@@ -323,15 +344,15 @@ mag_wrap_memory(size buf_size, void *buffer)
 static inline MagStaticArena
 mag_static_arena_create_internal(MagMemoryBlock mem)
 {
-    MagStaticArena arena = { .buf = mem, .buf_offset = 0, .prev_ptr = NULL, .prev_offset = 0, };
-
-#ifdef _MAG_TRACK_MEM_USAGE
-    arena.is_borrowed = false;
-    arena.max_offset = 0;
-    arena.failed_allocation = false;
-#endif
-
-    return arena;
+    return (MagStaticArena) 
+        {
+            .buf = mem,
+            .buf_offset = 0,
+            .prev_ptr = NULL,
+            .prev_offset = 0,
+            .max_offset = 0,
+            .failed_allocation = false
+        };
 }
 
 static inline MagStaticArena
@@ -358,27 +379,9 @@ mag_static_arena_allocate_and_create(size num_bytes)
     return arena;
 }
 
-static inline MagStaticArena
-mag_static_arena_borrow(MagStaticArena *arena)
-{
-    MagStaticArena borrowed = *arena;
-#ifdef _MAG_TRACK_MEM_USAGE
-    if(!borrowed.is_borrowed)
-    {
-        borrowed.is_borrowed = true;
-        borrowed.max_offset_ptr = &arena->max_offset;
-        borrowed.failed_allocation_ptr = &arena->failed_allocation;
-    }
-#endif
-    return borrowed;
-}
-
 static inline void
 mag_static_arena_destroy(MagStaticArena *arena)
 {
-#ifdef _MAG_TRACK_MEM_USAGE
-    Assert(!arena->is_borrowed);
-#endif
     MagMemoryBlock mem = arena->buf;
     *arena = (MagStaticArena){0};
     if(MAG_MEM_IS_OWNED(mem))
@@ -413,31 +416,18 @@ mag_static_arena_alloc(MagStaticArena *arena, size num_bytes, size alignment)
     {
         void *ptr = &arena->buf.mem[offset];
         memset(ptr, 0, num_bytes);
+        
         arena->prev_offset = arena->buf_offset;
-        arena->buf_offset = offset + num_bytes;
         arena->prev_ptr = ptr;
 
-#ifdef _MAG_TRACK_MEM_USAGE
-        if(arena->is_borrowed && *arena->max_offset_ptr < arena->buf_offset)
-        {
-             *arena->max_offset_ptr = arena->buf_offset; 
-        }
-        else if(arena->max_offset < arena->buf_offset)
-        {
-             arena->max_offset = arena->buf_offset; 
-        }
-#endif
+        arena->buf_offset = offset + num_bytes;
+        arena->max_offset = arena->max_offset < arena->buf_offset ? arena->buf_offset : arena->max_offset;
 
         return ptr;
     }
-    else
-    {
-#ifdef _MAG_TRACK_MEM_USAGE
-        if(arena->is_borrowed) { *arena->failed_allocation_ptr = true; }
-        else                   {  arena->failed_allocation    = true; }
-#endif
-        return NULL;
-    }
+
+    arena->failed_allocation = true;
+    return NULL;
 }
 
 static inline void * 
@@ -454,26 +444,13 @@ mag_static_arena_realloc(MagStaticArena *arena, void *ptr, size asize, size alig
         if ((size)(offset + asize) <= arena->buf.size)
         {
             arena->buf_offset = offset + asize;
-
-#ifdef _MAG_TRACK_MEM_USAGE
-            if(arena->is_borrowed && *arena->max_offset_ptr < arena->buf_offset)
-            {
-                 *arena->max_offset_ptr = arena->buf_offset; 
-            }
-            else if(arena->max_offset < arena->buf_offset)
-            {
-                 arena->max_offset = arena->buf_offset; 
-            }
-#endif
+            arena->max_offset = arena->max_offset < arena->buf_offset ? arena->buf_offset : arena->max_offset;
 
             return ptr;
         }
         else
         {
-#ifdef _MAG_TRACK_MEM_USAGE
-        if(arena->is_borrowed) { *arena->failed_allocation_ptr = true; }
-        else                   {  arena->failed_allocation    = true; }
-#endif
+            arena->failed_allocation = true;
         }
     }
 
@@ -491,23 +468,38 @@ mag_static_arena_free(MagStaticArena *arena, void *ptr)
     return;
 }
 
-#ifdef _MAG_TRACK_MEM_USAGE
+static inline MagStaticArenaSavePoint 
+mag_static_arena_create_save_point(MagStaticArena *arena)
+{
+    return (MagStaticArenaSavePoint)
+        {
+            .origin = arena,
+            .buf_offset = arena->buf_offset,
+            .prev_ptr = arena->prev_ptr,
+            .prev_offset = arena->prev_offset
+        };
+}
+
+static inline void 
+mag_static_arena_restore_save_point(MagStaticArenaSavePoint *save_point)
+{
+    MagStaticArena *origin = save_point->origin;
+    origin->buf_offset = save_point->buf_offset;
+    origin->prev_ptr = save_point->prev_ptr;
+    origin->prev_offset = save_point->prev_offset;
+}
 
 static inline f64 
 mag_static_arena_max_ratio(MagStaticArena *arena)
 {
-    Assert(!arena->is_borrowed);
     return (f64)arena->max_offset / (f64)arena->buf.size;
 }
 
 static inline b32 
 mag_static_arena_over_allocated(MagStaticArena *arena)
 {
-    Assert(!arena->is_borrowed);
     return arena->failed_allocation;
 }
-
-#endif
 
 struct MagDynArenaBlock
 {
@@ -515,9 +507,7 @@ struct MagDynArenaBlock
     size buf_offset;
     struct MagDynArenaBlock *next;
 
-#ifdef _MAG_TRACK_MEM_USAGE
     size max_buf_offset;
-#endif
 
 };
 
@@ -532,11 +522,7 @@ mag_dyn_arena_block_create(size block_size)
         block->buf_offset = sizeof(MagDynArenaBlock);
         block->buf = mem;
         block->next = NULL;
-
-#ifdef _MAG_TRACK_MEM_USAGE
         block->max_buf_offset = sizeof(MagDynArenaBlock);
-#endif
-
         return block;
     }
 
@@ -558,14 +544,13 @@ mag_dyn_arena_block_alloc(MagDynArenaBlock *block, size num_bytes, size alignmen
     {
         void *ptr = &block->buf.mem[offset];
         memset(ptr, 0, num_bytes);
+
         *prev_offset = block->buf_offset;
+        *prev_ptr = ptr;
+
         block->buf_offset = offset + num_bytes;
 
-#ifdef _MAG_TRACK_MEM_USAGE
         if(block->buf_offset > block->max_buf_offset) { block->max_buf_offset = block->buf_offset; }
-#endif
-
-        *prev_ptr = ptr;
 
         return ptr;
     }
@@ -579,10 +564,7 @@ mag_dyn_arena_create(size default_block_size)
     MagDynArena arena = {0};
 
     MagDynArenaBlock *block = mag_dyn_arena_block_create(default_block_size);
-    if(!block)
-    {
-        return arena;
-    }
+    if(!block) { return arena; }
 
     arena.head_block = block;
     arena.default_block_size = default_block_size;
@@ -590,17 +572,27 @@ mag_dyn_arena_create(size default_block_size)
     arena.prev_offset = 0;
     arena.prev_ptr = block;
 
-#ifdef _MAG_TRACK_MEM_USAGE
+    arena.orphaned_blocks_head = NULL;
+
     arena.failed_allocation = false;
-#endif
+    arena.max_total_allocations = 0;
 
     return arena;
 }
 
-static inline void mag_dyn_arena_destroy(MagDynArena *arena)
+static inline void 
+mag_dyn_arena_destroy(MagDynArena *arena)
 {
     /* Iterate through linked list and free all the blocks. */
     MagDynArenaBlock *curr = arena->head_block;
+    while(curr)
+    {
+        MagDynArenaBlock *next = curr->next;
+        mag_sys_memory_free(&curr->buf);
+        curr = next;
+    }
+
+    curr = arena->orphaned_blocks_head;
     while(curr)
     {
         MagDynArenaBlock *next = curr->next;
@@ -613,17 +605,65 @@ static inline void mag_dyn_arena_destroy(MagDynArena *arena)
     return;
 }
 
+static inline size
+mag_dyn_arena_internal_calc_total_allocations(MagDynArena *arena)
+{
+    size total_allocation_size = 0;
+
+    MagDynArenaBlock *curr = arena->head_block;
+    while(curr)
+    {
+        total_allocation_size += curr->max_buf_offset;
+        curr = curr->next;
+    }
+
+    curr = arena->orphaned_blocks_head;
+    while(curr)
+    {
+        total_allocation_size += curr->max_buf_offset;
+        curr = curr->next;
+    }
+
+    if(total_allocation_size > arena->max_total_allocations) 
+    {
+        arena->max_total_allocations = total_allocation_size;
+    }
+    else
+    {
+        total_allocation_size = arena->max_total_allocations;
+    }
+
+    return total_allocation_size;
+}
+
 static inline void 
 mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
 {
+    /* FIXME: To be more robust, free all old allocations first before creating one big new one. */
+
     /* Only actually do the coalesce if there is more than 1 block. */
-    b32 do_coalesce = coalesce && !!arena->head_block->next;
+    b32 do_coalesce = coalesce && (arena->head_block->next || arena->orphaned_blocks_head);
+
+    mag_dyn_arena_internal_calc_total_allocations(arena);
 
     MagDynArenaBlock *curr = NULL;
     if(do_coalesce)
     {
         /* Queue up all of the blocks to be deleted. */
         curr = arena->head_block;
+
+        /* Create a block large enough to hold ALL the data from last time in a single block. */
+        MagDynArenaBlock *block = mag_dyn_arena_block_create(arena->max_total_allocations);
+        if(!block)
+        {
+            arena->failed_allocation = true;
+        }
+
+        arena->head_block = block;
+        /* arena->default_block_size = ...doesn't need changed; */
+
+        arena->prev_offset = 0;
+        arena->prev_ptr = block;
     }
     else
     {
@@ -638,33 +678,6 @@ mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
         arena->head_block->next = NULL; /* Make sure the linked list is properly terminated. */
     }
 
-    /* Create a new head block if necesssary. */
-    if(do_coalesce)
-    {
-        /* Calculate how large to make the coalesced block. */
-        size max_total_bytes = arena->head_block->buf_offset;
-        MagDynArenaBlock *next = arena->head_block->next;
-        while(next)
-        {
-            max_total_bytes += next->buf_offset;
-            next = next->next;
-        }
-
-        /* Create a block large enough to hold ALL the data from last time in a single block. */
-        MagDynArenaBlock *block = mag_dyn_arena_block_create(max_total_bytes);
-        if(!block)
-        {
-            *arena = (MagDynArena){0};
-            return;
-        }
-
-        arena->head_block = block;
-        /* arena->default_block_size = ...doesn't need changed; */
-
-        arena->prev_offset = 0;
-        arena->prev_ptr = block;
-    }
-
     /* Free the unneeded blocks. */
     while(curr)
     {
@@ -672,6 +685,15 @@ mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
         mag_sys_memory_free(&curr->buf);
         curr = next;
     }
+
+    curr = arena->orphaned_blocks_head;
+    while(curr)
+    {
+        MagDynArenaBlock *next = curr->next;
+        mag_sys_memory_free(&curr->buf);
+        curr = next;
+    }
+    arena->orphaned_blocks_head = NULL;
 
     return;
 }
@@ -685,7 +707,27 @@ mag_dyn_arena_reset_default(MagDynArena *arena)
 static inline MagDynArenaBlock *
 mag_dyn_arena_add_block(MagDynArena *arena, size min_bytes)
 {
-    MagDynArenaBlock *block = mag_dyn_arena_block_create(min_bytes);
+    MagDynArenaBlock *block = NULL;
+
+    /* Take the first orphaned block that will do. */
+    MagDynArenaBlock *candidate = arena->orphaned_blocks_head;
+    MagDynArenaBlock **prev_candidate_next = &arena->orphaned_blocks_head;
+    while(candidate)
+    {
+        if(candidate->buf.size >= min_bytes)
+        {
+            block = candidate;
+            *prev_candidate_next = candidate->next;
+            block->buf_offset = 0;
+            break;
+        }
+
+        prev_candidate_next = &candidate->next;
+        candidate = candidate->next;
+    }
+
+    /* If we couldn't find an acceptable one among the orphans, then allocate a new block from the system. */
+    if(!block) { block = mag_dyn_arena_block_create(min_bytes); }
 
     if(block)
     {
@@ -706,6 +748,11 @@ mag_dyn_arena_alloc(MagDynArena *arena, size num_bytes, size alignment)
     void *ptr = mag_dyn_arena_block_alloc(block, num_bytes, alignment, &arena->prev_ptr, &arena->prev_offset);
     if(ptr) { return ptr; }
 
+    /* FIXME: ? I could also search all the other blocks in the linked list for space this size. This is a memory efficiency
+     * vs. speed trade off. I probably will not find space in the other blocks, so this will usually be a waste of time. It
+     * could help save memory waste though if my default_block_size is poorly tuned to the application.
+     */
+
     /* We need to add another block. */
     size block_size = num_bytes + alignment > arena->default_block_size ? num_bytes + alignment : arena->default_block_size;
     block = mag_dyn_arena_add_block(arena, block_size);
@@ -715,10 +762,7 @@ mag_dyn_arena_alloc(MagDynArena *arena, size num_bytes, size alignment)
     }
 
     /* Give up. */
-#ifdef _MAG_TRACK_MEM_USAGE
     if(!ptr) {arena->failed_allocation = true; }
-#endif
-
     return ptr;
 }
 
@@ -743,9 +787,7 @@ mag_dyn_arena_realloc(MagDynArena *arena, void *ptr, size num_bytes, size alignm
     void *new = mag_dyn_arena_alloc(arena, num_bytes, alignment);
     if(new) { memcpy(new, ptr, num_bytes); }
 
-#ifdef _MAG_TRACK_MEM_USAGE
     /* Failed allocations are tracked in mag_dyn_arena_alloc */
-#endif
 
     return new;
 }
@@ -761,19 +803,54 @@ mag_dyn_arena_free(MagDynArena *arena, void *ptr)
     return;
 }
 
-#ifdef _MAG_TRACK_MEM_USAGE
 static inline f64 
 mag_dyn_arena_max_ratio(MagDynArena *arena)
 {
-    size used = 0;
-    MagDynArenaBlock *curr = arena->head_block;
-    while(curr)
-    {
-        used += curr->max_buf_offset;
-        curr = curr->next;
-    }
+    size used = mag_dyn_arena_internal_calc_total_allocations(arena);
 
     return (f64)used / (f64)arena->default_block_size;
+}
+
+static inline MagDynArenaSavePoint 
+mag_dyn_arena_create_save_point(MagDynArena *arena)
+{
+    return (MagDynArenaSavePoint)
+        {
+            .origin = arena,
+            .head = arena->head_block,
+            .block_buf_offset = arena->head_block->buf_offset,
+            .prev_ptr = arena->prev_ptr,
+            .prev_offset = arena->prev_offset
+        };
+}
+
+static inline void 
+mag_dyn_arena_restore_save_point(MagDynArenaSavePoint *save_point)
+{
+    MagDynArena *origin = save_point->origin;
+    MagDynArenaBlock *head = origin->head_block;
+
+    if(head != save_point->head)
+    {
+        MagDynArenaBlock *tail = origin->orphaned_blocks_head; /* Preserve any blocks already on the list. */
+        origin->orphaned_blocks_head = head;
+
+        MagDynArenaBlock *curr = head;
+        while(curr->next != save_point->head)
+        {
+            curr = curr->next;
+        }
+
+        Assert(curr->next == save_point->head);
+
+        curr->next = tail;
+    }
+
+    origin->head_block = save_point->head;
+    origin->head_block->buf_offset = save_point->block_buf_offset;
+    origin->prev_ptr = save_point->prev_ptr;
+    origin->prev_offset = save_point->prev_offset;
+    return;
 }
 
 static inline b32 
@@ -781,8 +858,6 @@ mag_dyn_arena_over_allocated(MagDynArena *arena)
 {
     return arena->failed_allocation;
 }
-
-#endif
 
 static inline void
 mag_static_pool_initialize_linked_list(byte *buffer, size object_size, size num_objects)
@@ -894,20 +969,6 @@ mag_allocator_from_static_arena(MagStaticArena arena)
     return alloc;
 }
 
-static inline MagAllocator 
-mag_allocator_borrow(MagAllocator *alloc)
-{
-    MagAllocator borrowed = *alloc;
-
-    switch(alloc->type)
-    {
-        case MAG_ALLOC_T_STATIC_ARENA: borrowed.static_arena = mag_static_arena_borrow(&alloc->static_arena); break;
-        default: { Panic(); }
-    }
-
-    return borrowed;
-}
-
 static inline void 
 mag_allocator_destroy(MagAllocator *alloc)
 {
@@ -967,7 +1028,32 @@ mag_allocator_free(MagAllocator *alloc, void *ptr)
     }
 }
 
-#ifdef _MAG_TRACK_MEM_USAGE
+static inline MagAllocatorSavePoint 
+mag_allocator_create_save_point(MagAllocator *alloc)
+{
+    MagAllocatorSavePoint sp = { .type = alloc->type };
+    switch(alloc->type)
+    {
+        case MAG_ALLOC_T_STATIC_ARENA: sp.static_sp = mag_static_arena_create_save_point(&alloc->static_arena); break;
+        case MAG_ALLOC_T_DYN_ARENA:    sp.dyn_sp =    mag_dyn_arena_create_save_point(&alloc->dyn_arena);       break;
+        default: { Panic(); }
+    }
+
+    return sp;
+}
+
+static inline void 
+mag_allocator_restore_save_point(MagAllocatorSavePoint *save_point)
+{
+    switch(save_point->type)
+    {
+        case MAG_ALLOC_T_STATIC_ARENA: mag_static_arena_restore_save_point(&save_point->static_sp); break;
+        case MAG_ALLOC_T_DYN_ARENA:    mag_dyn_arena_restore_save_point(&save_point->dyn_sp);       break;
+        default: { Panic(); }
+    }
+
+}
+
 static inline f64 
 mag_allocator_max_ratio(MagAllocator *alloc)
 {
@@ -993,8 +1079,6 @@ mag_allocator_over_allocated(MagAllocator *alloc)
 
     return true; /* Unreachable. */
 }
-
-#endif
 
 static inline ElkStr 
 mag_str_alloc_copy_static(ElkStr src, MagStaticArena *arena)
