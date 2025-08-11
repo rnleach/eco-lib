@@ -963,8 +963,9 @@ elk_str_parse_i64(ElkStr str, i64 *result)
 static inline b32
 elk_str_robust_parse_f64(ElkStr str, f64 *out)
 {
-    /* The following block is required to create NAN/INF witnout using math.h on MSVC Using */
-    /* #define NAN (0.0/0.0) doesn't work either on MSVC, which gives C2124 divide by zero error. */
+    /* The following block is required to create NAN/INF witnout using math.h on MSVC. Using #define NAN (0.0/0.0) doesn't
+     * work either on MSVC, which gives C2124 divide by zero error.
+     */
     static f64 const ELK_ZERO = 0.0;
     f64 const ELK_INF = 1.0 / ELK_ZERO;
     f64 const ELK_NEG_INF = -1.0 / ELK_ZERO;
