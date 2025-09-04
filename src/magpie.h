@@ -78,6 +78,7 @@ typedef struct MagDynArenaBlock MagDynArenaBlock;
 typedef struct 
 {
     MagDynArenaBlock *head_block;
+    MagDynArenaBlock *current_block;
     size current_offset;
     size default_block_size;
 
@@ -406,11 +407,10 @@ struct MagDynArenaBlock
     size max_buf_offset;
 
     struct MagDynArenaBlock *next;
-    struct MagDynArenaBlock *previous;
 };
 
 static inline MagDynArenaBlock *
-mag_dyn_arena_block_create(size block_size, MagDynArenaBlock *prev, MagDynArenaBlock *next)
+mag_dyn_arena_block_create(size block_size)
 {
     MagMemoryBlock mem = mag_sys_memory_allocate(block_size + sizeof(MagDynArenaBlock));
     if(MAG_MEM_IS_VALID(mem))
@@ -419,8 +419,8 @@ mag_dyn_arena_block_create(size block_size, MagDynArenaBlock *prev, MagDynArenaB
         MagDynArenaBlock *block = (void *)mem.mem;
         block->max_buf_offset = sizeof(MagDynArenaBlock);
         block->buf = mem;
-        block->next = next;
-        block->previous = prev;
+        block->next = NULL;
+
         return block;
     }
 
@@ -460,10 +460,11 @@ mag_dyn_arena_create(size default_block_size)
 {
     MagDynArena arena = {0};
 
-    MagDynArenaBlock *block = mag_dyn_arena_block_create(default_block_size, NULL, NULL);
+    MagDynArenaBlock *block = mag_dyn_arena_block_create(default_block_size);
     if(block) 
     { 
         arena.head_block = block;
+        arena.current_block = block;
         arena.current_offset = sizeof(MagDynArenaBlock);
         arena.default_block_size = default_block_size;
 
@@ -478,9 +479,6 @@ static inline void
 mag_dyn_arena_destroy(MagDynArena *arena)
 {
     MagDynArenaBlock *curr = arena->head_block;
-
-    /* Get back to the first element in the list. */
-    while(curr->previous) { curr = curr->previous; }
 
     /* Iterate through the linked list and free all the blocks. */
     while(curr)
@@ -499,16 +497,15 @@ static inline void
 mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
 {
     /* Only actually do the coalesce if there is more than 1 block. */
-    b32 do_coalesce = coalesce && (arena->head_block->next || arena->head_block->previous);
+    b32 do_coalesce = coalesce && (arena->head_block->next != NULL);
 
     MagDynArenaBlock *curr = NULL;
     if(do_coalesce)
     {
         size allocations_ceiling = mag_dyn_arena_usage_ceiling(arena);
 
-        /* Rewind to the head of the list and delete all the blocks. */
+        /* Delete all the blocks. */
         curr = arena->head_block;
-        while(curr->previous) { curr = curr->previous; }
         while(curr)
         {
             MagDynArenaBlock *next = curr->next;
@@ -517,10 +514,11 @@ mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
         }
 
         /* Create a block large enough to hold ALL the data from last time in a single block. */
-        MagDynArenaBlock *block = mag_dyn_arena_block_create(allocations_ceiling, NULL, NULL);
+        MagDynArenaBlock *block = mag_dyn_arena_block_create(allocations_ceiling);
         if(!block) { Panic(); } /* This shouldn't happen, we literally just freed this much or more memory! */
 
         arena->head_block = block;
+        arena->current_block = block;
         arena->current_offset = sizeof(MagDynArenaBlock);
         /* arena->default_block_size = ...doesn't need changed; */
 
@@ -529,10 +527,8 @@ mag_dyn_arena_reset(MagDynArena *arena, b32 coalesce)
     }
     else
     {
-        /* Set the new head block to the end of the list. */
-        curr = arena->head_block;
-        while(curr->next) { curr = curr->next; }
-        arena->head_block = curr;
+        /* Set the new current block to the head of the list. */
+        arena->current_block  = arena->head_block;
         arena->current_offset = sizeof(MagDynArenaBlock);
         /* arena->default_block_size = ...doesn't need changed; */
 
@@ -550,68 +546,60 @@ mag_dyn_arena_reset_default(MagDynArena *arena)
 }
 
 static inline void
-mag_dyn_arena_block_remove(MagDynArenaBlock *block)
+mag_dyn_arena_block_remove(MagDynArenaBlock *block, MagDynArenaBlock *prev)
 {
     Assert(block);
 
-    MagDynArenaBlock *prev = block->previous;
     MagDynArenaBlock *next = block->next;
-
     if(prev) { prev->next = next; }
-    if(next) { next->previous = prev; }
 }
 
 static inline void
-mag_dyn_arena_block_insert(MagDynArenaBlock *block, MagDynArenaBlock *before_this_one)
+mag_dyn_arena_block_insert(MagDynArenaBlock *block, MagDynArenaBlock *after_this_one, MagDynArenaBlock *before_this_one)
 {
-    Assert(before_this_one && block);
-    block->previous = before_this_one->previous;
-    before_this_one->previous = block;
+    Assert(block);
+
+    if(after_this_one) { after_this_one->next = block; }
     block->next = before_this_one;
-    if(block->previous)
-    {
-        block->previous->next = block;
-    }
 }
 
 static inline MagDynArenaBlock *
 mag_dyn_arena_add_block_internal(MagDynArena *arena, size min_bytes)
 {
 
-    if(arena->head_block->previous)
-    {
-        /* Search backwards in the list, and find a large enough block. */
-        MagDynArenaBlock *candidate = arena->head_block->previous;
-        
-        if(candidate->buf.size >= min_bytes)
-        {
-            /* If it's the next block, just move the head pointer and it's good to go. */
-            arena->head_block = candidate;
-            return candidate;
-        }
-        else
-        {
-            candidate = candidate->previous;
-            while(candidate)
-            {
-                if(candidate->buf.size >= min_bytes)
-                {
-                    mag_dyn_arena_block_remove(candidate);
-                    mag_dyn_arena_block_insert(candidate, arena->head_block);
-                    arena->head_block = candidate;
-                    return candidate;
-                }
+    /* Search through the list to find a large enough block. */
 
-                candidate = candidate->previous;
-            }
-        }
+    /* Take the first one if possible, no fixup needed. */
+    MagDynArenaBlock *curr = arena->current_block->next;
+    MagDynArenaBlock *prev = NULL;
+    if(curr)
+    {
+        if(curr->buf.size >= min_bytes + sizeof(MagDynArenaBlock)) { return curr; }
+        prev = curr;
+        curr = curr->next;
     }
 
-    /* If you couldn't find a large enough block on the main list, create a new one and insert it at the heads. */
-    MagDynArenaBlock *block = mag_dyn_arena_block_create(min_bytes, arena->head_block->previous, arena->head_block);
-    if(block->previous) { block->previous->next = block; }
-    if(block->next)     { block->next->previous = block; }
-    arena->head_block = block;
+    while(curr)
+    {
+        if(curr->buf.size >= min_bytes + sizeof(MagDynArenaBlock))
+        {
+            prev->next = curr->next;
+            curr->next = arena->current_block->next;
+            arena->current_block->next = curr;
+            return curr;
+        }
+
+        prev = curr;
+        curr = curr->next;
+    }
+
+    /* If you couldn't find a large enough block on the main list, create a new one and insert it. */
+    MagDynArenaBlock *block = mag_dyn_arena_block_create(min_bytes);
+    if(!block) { return NULL; }
+
+    block->next = arena->current_block->next;
+    arena->current_block->next = block;
+    arena->current_block = block;
 
     return block;
 }
@@ -622,7 +610,7 @@ mag_dyn_arena_alloc(MagDynArena *arena, size num_bytes, size alignment)
     Assert(num_bytes > 0 && alignment > 0);
 
     /* Look for space in the current block. */
-    MagDynArenaBlock *block = arena->head_block;
+    MagDynArenaBlock *block = arena->current_block;
     void *ptr = mag_dyn_arena_block_alloc(arena, block, num_bytes, alignment);
     if(ptr) { return ptr; }
 
@@ -647,10 +635,10 @@ mag_dyn_arena_realloc(MagDynArena *arena, void *ptr, size num_bytes, size alignm
     if(ptr == arena->prev_ptr)
     {
         /* Get previous extra offset due to alignment */
-        uptr offset = (uptr)ptr - (uptr)arena->head_block->buf.mem; /* relative offset accounting for alignment */
+        uptr offset = (uptr)ptr - (uptr)arena->current_block->buf.mem; /* relative offset accounting for alignment */
 
         /* Check to see if there is enough space left */
-        if ((size)(offset + num_bytes) <= arena->head_block->buf.size)
+        if ((size)(offset + num_bytes) <= arena->current_block->buf.size)
         {
             arena->current_offset = offset + num_bytes;
             return ptr;
@@ -684,9 +672,6 @@ mag_dyn_arena_usage_ceiling(MagDynArena *arena)
     size total_allocation_size = 0;
 
     MagDynArenaBlock *curr = arena->head_block;
-
-    /* Get back to the first element in the list. */
-    while(curr->previous) { curr = curr->previous; }
 
     while(curr)
     {
