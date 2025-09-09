@@ -156,8 +156,13 @@ typedef struct
 
 static inline MagAllocator mag_allocator_dyn_arena_create(size default_block_size);
 static inline MagAllocator mag_allocator_static_arena_create(size buf_size, byte buffer[]);
-static inline MagAllocator mag_allocator_from_dyn_arena(MagDynArena arena);       /* Takes ownership of arena. */
-static inline MagAllocator mag_allocator_from_static_arena(MagStaticArena arena); /* Takes ownership of arena. */
+static inline MagAllocator mag_allocator_from_dyn_arena(MagDynArena *arena);       /* Takes ownership of arena and zeros original struct. */
+static inline MagAllocator mag_allocator_from_static_arena(MagStaticArena *arena); /* Takes ownership of arena and zeros original struct. */
+
+#define eco_allocator_take(arena) _Generic((arena),                                                                         \
+                                     MagStaticArena *: mag_allocator_from_static_arena,                                     \
+                                     MagDynArena *:    mag_allocator_from_static_arena                                      \
+                                  )(arena)
 
 static inline void mag_allocator_destroy(MagAllocator *arena);
 static inline void mag_allocator_reset(MagAllocator *arena); /* Clear all previous allocations. */
@@ -779,16 +784,18 @@ mag_allocator_static_arena_create(size buf_size, byte buffer[])
 }
 
 static inline MagAllocator 
-mag_allocator_from_dyn_arena(MagDynArena arena)
+mag_allocator_from_dyn_arena(MagDynArena *arena)
 {
-    MagAllocator alloc = { .type = MAG_ALLOC_T_DYN_ARENA, .dyn_arena = arena };
+    MagAllocator alloc = { .type = MAG_ALLOC_T_DYN_ARENA, .dyn_arena = *arena };
+    *arena = (MagDynArena) {0};
     return alloc;
 }
 
 static inline MagAllocator 
-mag_allocator_from_static_arena(MagStaticArena arena)
+mag_allocator_from_static_arena(MagStaticArena *arena)
 {
-    MagAllocator alloc = { .type = MAG_ALLOC_T_STATIC_ARENA, .static_arena = arena };
+    MagAllocator alloc = { .type = MAG_ALLOC_T_STATIC_ARENA, .static_arena = *arena };
+    *arena = (MagStaticArena) {0};
     return alloc;
 }
 
