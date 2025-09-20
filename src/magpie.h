@@ -898,6 +898,7 @@ mag_str_append_static(ElkStr dest, ElkStr src, MagStaticArena *arena)
     result.len = new_len;
     char *dest_ptr = dest.start + dest.len;
     memcpy(dest_ptr, src.start, src.len);
+    result.start[result.len] = '\0';
 
     return result;
 }
@@ -920,6 +921,7 @@ mag_str_append_cstr_static(ElkStr dest, char const *src, MagStaticArena *arena)
     result.len = new_len;
     char *dest_ptr = dest.start + dest.len;
     memcpy(dest_ptr, src, src_len);
+    result.start[result.len] = '\0';
 
     return result;
 }
@@ -974,6 +976,7 @@ mag_str_append_dyn(ElkStr dest, ElkStr src, MagDynArena *arena)
         char *dest_ptr = dest.start + dest.len;
         memcpy(dest_ptr, src.start, src.len);
     }
+    result.start[result.len] = '\0';
 
     return result;
 }
@@ -990,12 +993,30 @@ mag_str_append_cstr_dyn(ElkStr dest, char const *src, MagDynArena *arena)
     char *buf = dest.start;
     buf = mag_dyn_arena_nrealloc(arena, buf, new_len + 1, char); /* +1 for null terminator. */
 
-    if(!buf) { return result; }
+    if(!buf)
+    { 
+        /* Failed to grow in place. */
+        buf = mag_dyn_arena_nmalloc(arena, new_len + 1, char);
+        if(buf)
+        {
+            char *dest_ptr = buf;
+            memcpy(dest_ptr, dest.start, dest.len);
+            dest_ptr = dest_ptr + dest.len;
+            memcpy(dest_ptr, src, src_len);
 
-    result.start = buf;
-    result.len = new_len;
-    char *dest_ptr = dest.start + dest.len;
-    memcpy(dest_ptr, src, src_len);
+            result.start = buf;
+            result.len = new_len;
+        }
+    }
+    else
+    {
+        /* Grew in place! */
+        result.start = buf;
+        result.len = new_len;
+        char *dest_ptr = dest.start + dest.len;
+        memcpy(dest_ptr, src, src_len);
+    }
+    result.start[result.len] = '\0';
 
     return result;
 }
@@ -1050,6 +1071,7 @@ mag_str_append_alloc(ElkStr dest, ElkStr src, MagAllocator *alloc)
         char *dest_ptr = dest.start + dest.len;
         memcpy(dest_ptr, src.start, src.len);
     }
+    result.start[result.len] = '\0';
 
     return result;
 }
@@ -1066,12 +1088,30 @@ mag_str_append_cstr_alloc(ElkStr dest, char const *src, MagAllocator *alloc)
     char *buf = dest.start;
     buf = mag_allocator_nrealloc(alloc, buf, new_len + 1, char); /* +1 for null terminator. */
 
-    if(!buf) { return result; }
+    if(!buf)
+    { 
+        /* Failed to grow in place. */
+        buf = mag_allocator_nmalloc(alloc, new_len + 1, char);
+        if(buf)
+        {
+            char *dest_ptr = buf;
+            memcpy(dest_ptr, dest.start, dest.len);
+            dest_ptr = dest_ptr + dest.len;
+            memcpy(dest_ptr, src, src_len);
 
-    result.start = buf;
-    result.len = new_len;
-    char *dest_ptr = dest.start + dest.len;
-    memcpy(dest_ptr, src, src_len);
+            result.start = buf;
+            result.len = new_len;
+        }
+    }
+    else
+    {
+        /* Grew in place! */
+        result.start = buf;
+        result.len = new_len;
+        char *dest_ptr = dest.start + dest.len;
+        memcpy(dest_ptr, src, src_len);
+    }
+    result.start[result.len] = '\0';
 
     return result;
 }
