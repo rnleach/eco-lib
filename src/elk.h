@@ -1,6 +1,9 @@
 #ifndef _ELK_HEADER_
 #define _ELK_HEADER_
 
+/* TODO: Add an efficient (SIMD) line count function to ElkStr. */
+/* TODO: Parse more date formats (Specifically: 1 Jan, 2025    */
+
 /* Change some warning settings for MSVC. This code is well tested and we use some "tricks" for performance, and I don't
  * want to be bothered in other projects by those warnings.
  */
@@ -25,7 +28,6 @@
  *                                                 Define simpler types
  *-------------------------------------------------------------------------------------------------------------------------*/
 
-/* Other libraries I may have already included may use these exact definitions too. */
 #ifndef _TYPE_ALIASES_
 #define _TYPE_ALIASES_
 
@@ -237,6 +239,7 @@ static inline ElkDate elk_date_from_struct_date(ElkStructDate sdate);
 static inline i64 elk_date_to_unix_epoch(ElkDate date);
 static inline ElkStructDate elk_make_struct_date(ElkDate date);
 static inline ElkDateDiff elk_date_difference(ElkDate a, ElkDate b); /* a - b, the difference in days. */
+
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                      String Slice
  *---------------------------------------------------------------------------------------------------------------------------
@@ -271,6 +274,7 @@ static inline ElkStr elk_str_strip(ElkStr input);                          /* St
 static inline ElkStr elk_str_substr(ElkStr str, size start, size len);     /* Create a substring from a longer string      */
 static inline i32 elk_str_cmp(ElkStr left, ElkStr right);                  /* 0 if equal, -1 if left is first, 1 otherwise */
 static inline b32 elk_str_eq(ElkStr const left, ElkStr const right);       /* Faster than elk_str_cmp, checks length first */
+static inline b32 elk_str_null_terminated(ElkStr const str);               /* Can cause a segfault, good to use in Asserts */
 static inline ElkStrSplitPair elk_str_split_on_char(ElkStr str, char const split_char);
 
 
@@ -820,6 +824,12 @@ elk_str_eq(ElkStr const left, ElkStr const right)
     if (left.len != right.len) { return false; }
     size len = left.len > right.len ? right.len : left.len;
     return !memcmp(left.start, right.start, len);
+}
+
+static inline b32 
+elk_str_null_terminated(ElkStr const str)
+{
+    return str.start[str.len] == '\0';
 }
 
 static inline ElkStrSplitPair

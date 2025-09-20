@@ -221,23 +221,23 @@ static inline void mag_allocator_free(MagAllocator *alloc, void *ptr);
 static inline ElkStr mag_str_alloc_copy_static(ElkStr src, MagStaticArena *arena);          /* Allocate space and create a copy.                                                        */
 static inline ElkStr mag_str_append_static(ElkStr dest, ElkStr src, MagStaticArena *arena); /* If dest wasn't the last thing allocated on arena, this fails and returns an empty string */
 
-static inline ElkStr mag_str_append_dyn(ElkStr dest, ElkStr src, MagDynArena *arena); 
 static inline ElkStr mag_str_alloc_copy_dyn(ElkStr src, MagDynArena *arena);
+static inline ElkStr mag_str_append_dyn(ElkStr dest, ElkStr src, MagDynArena *arena); 
 
-static inline ElkStr mag_str_append_alloc(ElkStr dest, ElkStr src, MagAllocator *alloc); 
 static inline ElkStr mag_str_alloc_copy_alloc(ElkStr src, MagAllocator *alloc);
-
-#define eco_str_append(dest, src, alloc) _Generic((alloc),                                                                  \
-                                             MagStaticArena *: mag_str_append_static,                                       \
-                                             MagDynArena *:    mag_str_append_dyn,                                          \
-                                             MagAllocator *:   mag_str_append_alloc                                         \
-                                         )(dest, src, alloc)
+static inline ElkStr mag_str_append_alloc(ElkStr dest, ElkStr src, MagAllocator *alloc); 
 
 #define eco_str_alloc_copy(src, alloc) _Generic((alloc),                                                                    \
                                              MagStaticArena *: mag_str_alloc_copy_static,                                   \
                                              MagDynArena *:    mag_str_alloc_copy_dyn,                                      \
                                              MagAllocator *:   mag_str_alloc_copy_alloc                                     \
                                          )(src, alloc)
+
+#define eco_str_append(dest, src, alloc) _Generic((alloc),                                                                  \
+                                             MagStaticArena *: mag_str_append_static,                                       \
+                                             MagDynArena *:    mag_str_append_dyn,                                          \
+                                             MagAllocator *:   mag_str_append_alloc                                         \
+                                         )(dest, src, alloc)
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *
@@ -881,7 +881,7 @@ mag_str_append_static(ElkStr dest, ElkStr src, MagStaticArena *arena)
 
     size new_len = dest.len + src.len;
     char *buf = dest.start;
-    buf = mag_static_arena_nrealloc(arena, buf, new_len, char);
+    buf = mag_static_arena_nrealloc(arena, buf, new_len + 1, char); /* +1 for null terminator. */
 
     if(!buf) { return result; }
 
@@ -889,46 +889,6 @@ mag_str_append_static(ElkStr dest, ElkStr src, MagStaticArena *arena)
     result.len = new_len;
     char *dest_ptr = dest.start + dest.len;
     memcpy(dest_ptr, src.start, src.len);
-
-    return result;
-}
-
-static inline ElkStr 
-mag_str_append_dyn(ElkStr dest, ElkStr src, MagDynArena *arena)
-{
-    ElkStr result = {0};
-
-    if(src.len <= 0) { return result; }
-
-    size new_len = dest.len + src.len;
-    char *buf = dest.start;
-    buf = mag_dyn_arena_nrealloc(arena, buf, new_len, char);
-
-    if(!buf)
-    { 
-        /* Failed to grow in place. */
-        buf = mag_dyn_arena_nmalloc(arena, new_len, char);
-        if(buf)
-        {
-            char *dest_ptr = buf;
-            memcpy(dest_ptr, dest.start, dest.len);
-            dest_ptr = dest_ptr + dest.len;
-            memcpy(dest_ptr, src.start, src.len);
-
-            result.start = buf;
-            result.len = new_len;
-        }
-
-        /* else leave result as empty - a null string. */
-    }
-    else
-    {
-        /* Grew in place! */
-        result.start = buf;
-        result.len = new_len;
-        char *dest_ptr = dest.start + dest.len;
-        memcpy(dest_ptr, src.start, src.len);
-    }
 
     return result;
 }
@@ -948,7 +908,7 @@ mag_str_alloc_copy_dyn(ElkStr src, MagDynArena *arena)
 }
 
 static inline ElkStr 
-mag_str_append_alloc(ElkStr dest, ElkStr src, MagAllocator *alloc)
+mag_str_append_dyn(ElkStr dest, ElkStr src, MagDynArena *arena)
 {
     ElkStr result = {0};
 
@@ -956,12 +916,12 @@ mag_str_append_alloc(ElkStr dest, ElkStr src, MagAllocator *alloc)
 
     size new_len = dest.len + src.len;
     char *buf = dest.start;
-    buf = mag_allocator_nrealloc(alloc, buf, new_len, char);
+    buf = mag_dyn_arena_nrealloc(arena, buf, new_len + 1, char); /* +1 for null terminator */
 
     if(!buf)
     { 
         /* Failed to grow in place. */
-        buf = mag_allocator_nmalloc(alloc, new_len, char);
+        buf = mag_dyn_arena_nmalloc(arena, new_len, char);
         if(buf)
         {
             char *dest_ptr = buf;
@@ -999,6 +959,46 @@ mag_str_alloc_copy_alloc(ElkStr src, MagAllocator *alloc)
     ret_val = elk_str_copy(copy_len, buffer, src);
 
     return ret_val;
+}
+
+static inline ElkStr 
+mag_str_append_alloc(ElkStr dest, ElkStr src, MagAllocator *alloc)
+{
+    ElkStr result = {0};
+
+    if(src.len <= 0) { return result; }
+
+    size new_len = dest.len + src.len;
+    char *buf = dest.start;
+    buf = mag_allocator_nrealloc(alloc, buf, new_len + 1, char); /* +1 for null terminator */
+
+    if(!buf)
+    { 
+        /* Failed to grow in place. */
+        buf = mag_allocator_nmalloc(alloc, new_len, char);
+        if(buf)
+        {
+            char *dest_ptr = buf;
+            memcpy(dest_ptr, dest.start, dest.len);
+            dest_ptr = dest_ptr + dest.len;
+            memcpy(dest_ptr, src.start, src.len);
+
+            result.start = buf;
+            result.len = new_len;
+        }
+
+        /* else leave result as empty - a null string. */
+    }
+    else
+    {
+        /* Grew in place! */
+        result.start = buf;
+        result.len = new_len;
+        char *dest_ptr = dest.start + dest.len;
+        memcpy(dest_ptr, src.start, src.len);
+    }
+
+    return result;
 }
 
 #if defined(_WIN32) || defined(_WIN64)
