@@ -588,14 +588,14 @@ mag_dyn_arena_add_block_internal(MagDynArena *arena, size min_bytes)
     MagDynArenaBlock *prev = NULL;
     if(curr)
     {
-        if(curr->buf.size >= min_bytes + sizeof(MagDynArenaBlock)) { return curr; }
+        if(curr->buf.size >= min_bytes + (size)sizeof(MagDynArenaBlock)) { return curr; }
         prev = curr;
         curr = curr->next;
     }
 
     while(curr)
     {
-        if(curr->buf.size >= min_bytes + sizeof(MagDynArenaBlock))
+        if(curr->buf.size >= min_bytes + (size)sizeof(MagDynArenaBlock))
         {
             prev->next = curr->next;
             curr->next = arena->current_block->next;
