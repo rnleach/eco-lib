@@ -1,7 +1,6 @@
 #ifndef _ELK_HEADER_
 #define _ELK_HEADER_
 
-/* TODO: Add an efficient (SIMD) line count function to ElkStr. */
 /* TODO: Parse more date formats (Specifically: 1 Jan, 2025    */
 
 /* Change some warning settings for MSVC. This code is well tested and we use some "tricks" for performance, and I don't
@@ -22,6 +21,7 @@
 
 #if defined(_WIN64) || defined(_WIN32)
 #define __lzcnt32(a) __lzcnt(a)
+#define __builtin_popcount(a) __popcnt(a)
 #endif
 
 /*---------------------------------------------------------------------------------------------------------------------------
@@ -276,6 +276,7 @@ static inline i32 elk_str_cmp(ElkStr left, ElkStr right);                  /* 0 
 static inline b32 elk_str_eq(ElkStr const left, ElkStr const right);       /* Faster than elk_str_cmp, checks length first */
 static inline b32 elk_str_null_terminated(ElkStr const str);               /* Can cause a segfault, good to use in Asserts */
 static inline ElkStrSplitPair elk_str_split_on_char(ElkStr str, char const split_char);
+static inline i64 elk_str_line_count(ElkStr str);
 
 
 /* Parsing values from strings.
@@ -847,6 +848,68 @@ elk_str_split_on_char(ElkStr str, char const split_char)
     }
 
     return (ElkStrSplitPair) { .left = left, .right = right};
+}
+
+static inline i64 
+elk_str_line_count(ElkStr str)
+{
+    StopIf(!str.start || str.len <= 0, return 0);
+
+    i64 count = 1;
+
+    /* Check to make sure we have AVX. */
+    if(__AVX2__)
+    {
+        __m256i newline = _mm256_set1_epi8('\n');
+
+        char const *s = str.start;
+        uptr addr = (uptr)s;
+        usize offset = addr & 31;
+        usize length = str.len;
+        
+        /* Prefix */
+        if(offset > 0 && offset <= length)
+        {
+            for(usize c = 0; c < offset; ++c)
+            {
+                if(s[c] == '\n') { count += 1; }
+            }
+            length -= offset;
+            s += offset;
+        }
+
+        /* Main body */
+        while (length >= 32) {
+            __m256i chunk = _mm256_load_si256((__m256i const *)s);
+
+            /* Compare for newlines and extract bitmask (bit i set if byte i == '\n') */
+            __m256i eq_nl = _mm256_cmpeq_epi8(chunk, newline);
+            u32 nl_mask = (u32)_mm256_movemask_epi8(eq_nl);
+
+            count += __builtin_popcount(nl_mask);
+
+            s += 32;
+            length -= 32;
+        }
+
+        /* Suffix */
+        if(length > 0)
+        {
+            for(usize c = 0; c < length; ++c)
+            {
+                if(s[c] == '\n') { count += 1; }
+            }
+        }
+    }
+    else
+    {
+        for(size c = 0; c < str.len; ++c)
+        {
+            if(str.start[c] == '\n') { count += 1; }
+        }
+    }
+
+    return count;
 }
 
 _Static_assert(sizeof(size) == sizeof(uptr), "intptr_t and uintptr_t aren't the same size?!");
