@@ -161,7 +161,7 @@ static inline MagAllocator mag_allocator_from_static_arena(MagStaticArena *arena
 
 #define eco_allocator_take(arena) _Generic((arena),                                                                         \
                                      MagStaticArena *: mag_allocator_from_static_arena,                                     \
-                                     MagDynArena *:    mag_allocator_from_static_arena                                      \
+                                     MagDynArena *:    mag_allocator_from_dyn_arena                                         \
                                   )(arena)
 
 static inline void mag_allocator_destroy(MagAllocator *arena);
