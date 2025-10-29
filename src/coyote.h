@@ -92,7 +92,6 @@ static inline ElkStr coy_file_slurp_text_allocator(char const *filename, MagAllo
                                          )(fname, alloc)
 
 
-
 #define COY_FILE_WRITER_BUF_SIZE ECO_KiB(32)
 typedef struct
 {
@@ -210,13 +209,13 @@ typedef struct
     b32 valid;
 } CoyCondVar;
 
-static inline b32 coy_thread_create(CoyThread *thrd, CoyThreadFunc func, void *thread_data); /* Returns NULL on failure. */
-static inline b32 coy_thread_join(CoyThread *thread); /* Returns false if there was an error. */
+static inline b32 coy_thread_create(CoyThread *thrd, CoyThreadFunc func, void *thread_data);  /* Returns false on failure. */
+static inline b32 coy_thread_join(CoyThread *thread);                              /* Returns false if there was an error. */
 static inline void coy_thread_destroy(CoyThread *thread);
 
 static inline CoyMutex coy_mutex_create(void);
-static inline b32 coy_mutex_lock(CoyMutex *mutex);    /* Block, return false on failure. */
-static inline b32 coy_mutex_unlock(CoyMutex *mutex);  /* Return false on failure.        */
+static inline b32 coy_mutex_lock(CoyMutex *mutex);     /* Block, return false on failure. */
+static inline b32 coy_mutex_unlock(CoyMutex *mutex);   /* Return false on failure.        */
 static inline void coy_mutex_destroy(CoyMutex *mutex); /* Must set valid member to false. */
 
 static inline CoyCondVar coy_condvar_create(void);
@@ -230,7 +229,7 @@ static inline void coy_condvar_destroy(CoyCondVar *cv); /* Must set valid member
  *---------------------------------------------------------------------------------------------------------------------------
  * Threadsafe channel for sending / receiving pointers. Multiple Producer / Multiple Consumer (mpmc)
  */
-#define COYOTE_CHANNEL_SIZE 16
+#define COYOTE_CHANNEL_SIZE 64
 typedef struct
 {
     size head;
