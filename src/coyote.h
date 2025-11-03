@@ -331,7 +331,7 @@ typedef struct
     CoyThread threads[COY_MAX_THREAD_POOL_SIZE];
 } CoyThreadPool;
 
-static inline CoyThreadPool coy_threadpool_create(size nthreads);
+static inline void coy_threadpool_initialize(CoyThreadPool *pool, size nthreads);
 static inline void coy_threadpool_destroy(CoyThreadPool *pool);    /* Finish pending tasks and shut down. */
 static inline void coy_threadpool_submit(CoyThreadPool *pool, CoyFuture *fut);
 
@@ -1199,23 +1199,21 @@ coy_thread_pool_executor_internal(void *input_channel)
     coy_channel_done_receiving(tasks);
 }
 
-static inline CoyThreadPool 
-coy_threadpool_create(size nthreads)
+static inline void 
+coy_threadpool_initialize(CoyThreadPool *pool, size nthreads)
 {
     Assert(nthreads <= COY_MAX_THREAD_POOL_SIZE);
 
-    CoyThreadPool pool = { .nthreads = nthreads };
-    pool.queue = coy_channel_create();
-    coy_channel_register_sender(&pool.queue);
+    pool->nthreads = nthreads;
+    pool->queue = coy_channel_create();
+    coy_channel_register_sender(&pool->queue);
 
     for(size i = 0; i < nthreads; ++i)
     {
-        coy_thread_create(&pool.threads[i], coy_thread_pool_executor_internal, &pool.queue);
-        coy_channel_register_receiver(&pool.queue);
+        coy_thread_create(&pool->threads[i], coy_thread_pool_executor_internal, &pool->queue);
+        coy_channel_register_receiver(&pool->queue);
     }
-    coy_channel_wait_until_ready_to_send(&pool.queue);
-
-    return pool;
+    coy_channel_wait_until_ready_to_send(&pool->queue);
 }
 
 static inline void 

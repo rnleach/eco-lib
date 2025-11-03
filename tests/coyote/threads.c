@@ -440,8 +440,9 @@ static void
 test_thread_pool(void)
 {
 #define NUM_TEST_TASKS 5000
-    CoyThreadPool pool_ = coy_threadpool_create(5);
+    CoyThreadPool pool_ = {0};
     CoyThreadPool *pool = &pool_;
+    coy_threadpool_initialize(pool, 5);
 
     CoyThreadPoolTestTaskData td[NUM_TEST_TASKS] = {0};
     CoyFuture futures[NUM_TEST_TASKS] = {0};
