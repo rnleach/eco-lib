@@ -7,6 +7,8 @@
 #include "elk.h"
 #include "magpie.h"
 
+#include <immintrin.h>
+
 #pragma warning(push)
 
 /*---------------------------------------------------------------------------------------------------------------------------
@@ -291,6 +293,47 @@ static inline void coy_task_thread_destroy(CoyTaskThread *thread);
                                    CoyThread *: coy_thread_destroy,                                                         \
                                    CoyTaskThread *: coy_task_thread_destroy                                                 \
                                  )(thrd)
+
+/*---------------------------------------------------------------------------------------------------------------------------
+ *                                                      Thread Pool
+ *---------------------------------------------------------------------------------------------------------------------------
+ * A pool of worker threads.
+ */
+
+typedef enum 
+{ 
+    COY_FUTURE_STATE_ERROR,     /* Initialization is an error! If zero initialized.                                        */
+    COY_FUTURE_STATE_CREATED,   /* Created but not yet submitted.                                                          */
+    COY_FUTURE_STATE_PENDING,   /* It's been added to the queue, but not started.                                          */
+    COY_FUTURE_STATE_RUNNING,   /* It's currently running.                                                                 */
+    COY_FUTURE_STATE_COMPLETE,  /* The task is done and ready to consume.                                                  */
+    COY_FUTURE_STATE_CONSUMED   /* Let the client mark that they have consumed the result; the future is no longer needed. */
+} CoyTaskState;
+
+typedef struct
+{
+    volatile CoyTaskState state;
+    CoyThreadFunc function;
+    void *future_data;                /* function arguments and return values go in here. */
+} CoyFuture;
+
+static inline CoyFuture coy_future_create(CoyThreadFunc function, void *future_data);
+static inline CoyTaskState coy_future_get_task_state(CoyFuture *fut);
+static inline b32 coy_future_is_complete(CoyFuture *fut);
+static inline void coy_future_mark_consumed(CoyFuture *fut);
+static inline b32 coy_future_is_consumed(CoyFuture *fut);
+
+#define COY_MAX_THREAD_POOL_SIZE 32
+typedef struct
+{
+    CoyChannel queue;
+    size nthreads;
+    CoyThread threads[COY_MAX_THREAD_POOL_SIZE];
+} CoyThreadPool;
+
+static inline CoyThreadPool coy_threadpool_create(size nthreads);
+static inline void coy_threadpool_destroy(CoyThreadPool *pool);    /* Finish pending tasks and shut down. */
+static inline void coy_threadpool_submit(CoyThreadPool *pool, CoyFuture *fut);
 
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                    Profiling Tools
@@ -1101,6 +1144,98 @@ coy_file_slurp_text_allocator(char const *filename, MagAllocator *alloc)
 
 ERR_RETURN:
     return (ElkStr){ .start = NULL, .len = 0 };
+}
+
+
+static inline CoyFuture 
+coy_future_create(CoyThreadFunc function, void *future_data)
+{
+    CoyFuture fut = { .state = COY_FUTURE_STATE_CREATED, .function = function, .future_data = future_data };
+    return fut;
+}
+
+static inline CoyTaskState 
+coy_future_get_task_state(CoyFuture *fut)
+{
+    return fut->state;
+}
+
+static inline b32 
+coy_future_is_complete(CoyFuture *fut)
+{
+    return fut->state == COY_FUTURE_STATE_COMPLETE;
+}
+
+static inline void coy_future_mark_consumed(CoyFuture *fut)
+{
+    Assert(fut->state == COY_FUTURE_STATE_COMPLETE);
+    fut->state = COY_FUTURE_STATE_CONSUMED;
+}
+
+static inline b32 
+coy_future_is_consumed(CoyFuture *fut)
+{
+    return fut->state == COY_FUTURE_STATE_CONSUMED;
+}
+
+static inline void 
+coy_thread_pool_executor_internal(void *input_channel)
+{
+    CoyChannel *tasks = input_channel;
+    coy_channel_wait_until_ready_to_receive(tasks);
+
+    void *void_task;
+    while(coy_channel_receive(tasks, &void_task))
+    {
+        CoyFuture *fut = void_task;
+        Assert(fut->state == COY_FUTURE_STATE_PENDING);
+        fut->state = COY_FUTURE_STATE_RUNNING;
+        _mm_mfence();
+        fut->function(fut->future_data);
+        _mm_mfence();
+        fut->state = COY_FUTURE_STATE_COMPLETE;
+    }
+
+    coy_channel_done_receiving(tasks);
+}
+
+static inline CoyThreadPool 
+coy_threadpool_create(size nthreads)
+{
+    Assert(nthreads <= COY_MAX_THREAD_POOL_SIZE);
+
+    CoyThreadPool pool = { .nthreads = nthreads };
+    pool.queue = coy_channel_create();
+    coy_channel_register_sender(&pool.queue);
+
+    for(size i = 0; i < nthreads; ++i)
+    {
+        coy_thread_create(&pool.threads[i], coy_thread_pool_executor_internal, &pool.queue);
+        coy_channel_register_receiver(&pool.queue);
+    }
+    coy_channel_wait_until_ready_to_send(&pool.queue);
+
+    return pool;
+}
+
+static inline void 
+coy_threadpool_destroy(CoyThreadPool *pool)
+{
+    coy_channel_done_sending(&pool->queue);
+    for(size i = 0; i < pool->nthreads; ++i)
+    {
+        coy_thread_join(&pool->threads[i]);
+        coy_thread_destroy(&pool->threads[i]);
+    }
+    coy_channel_destroy(&pool->queue, NULL, NULL);
+    memset(pool, 0, sizeof(*pool));
+}
+
+static inline void 
+coy_threadpool_submit(CoyThreadPool *pool, CoyFuture *fut)
+{
+    fut->state = COY_FUTURE_STATE_PENDING;
+    coy_channel_send(&pool->queue, fut);
 }
 
 #if defined(_WIN32) || defined(_WIN64)

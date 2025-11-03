@@ -418,6 +418,61 @@ test_task_multiple_producer_multiple_consumer(i32 num_to_send)
     Assert(total == 4 * num_to_send);
 }
 
+/*--------------------------------------------------------------------------------------------------------------------------
+ *
+ *                                                 Tests for ThreadPool
+ *
+ *-------------------------------------------------------------------------------------------------------------------------*/
+typedef struct
+{
+    i32 x;
+    i32 two_x;
+} CoyThreadPoolTestTaskData;
+
+static inline void
+coy_thread_pool_test_task_function(void *data)
+{
+    CoyThreadPoolTestTaskData *td = data;
+    td->two_x = 2 * td->x;
+}
+
+static void
+test_thread_pool(void)
+{
+#define NUM_TEST_TASKS 5000
+    CoyThreadPool pool_ = coy_threadpool_create(5);
+    CoyThreadPool *pool = &pool_;
+
+    CoyThreadPoolTestTaskData td[NUM_TEST_TASKS] = {0};
+    CoyFuture futures[NUM_TEST_TASKS] = {0};
+
+    for(i32 i = 0; i < NUM_TEST_TASKS; ++i)
+    {
+        td[i].x = i;
+        futures[i] = coy_future_create(coy_thread_pool_test_task_function, &td[i]);
+        coy_threadpool_submit(pool, &futures[i]);
+    }
+
+    b32 complete = false;
+    while(!complete)
+    {
+        complete = true;
+        for(i32 i = 0; i < NUM_TEST_TASKS; ++i)
+        {
+            if(coy_future_is_complete(&futures[i]))
+            {
+                Assert(td[i].two_x == td[i].x * 2);
+                coy_future_mark_consumed(&futures[i]);
+            }
+
+            complete &= coy_future_is_consumed(&futures[i]);
+        }
+    }
+
+    coy_threadpool_destroy(pool);
+#undef NUM_TEST_TASKS
+}
+
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                   All threads tests
  *-------------------------------------------------------------------------------------------------------------------------*/
@@ -451,6 +506,9 @@ coyote_threads_tests(void)
     fprintf(stderr,".task mpmc..");
     test_task_multiple_producer_multiple_consumer(1000000);
     test_task_multiple_producer_multiple_consumer(10);
+
+    fprintf(stderr,".thread pool..");
+    test_thread_pool();
 
 }
 
