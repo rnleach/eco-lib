@@ -865,17 +865,18 @@ elk_str_line_count(ElkStr str)
         char const *s = str.start;
         uptr addr = (uptr)s;
         usize offset = addr & 31;
+        usize num_to_align = 32 - offset;
         usize length = str.len;
         
         /* Prefix */
-        if(offset > 0 && offset <= length)
+        if(num_to_align > 0 && num_to_align <= length)
         {
-            for(usize c = 0; c < offset; ++c)
+            for(usize c = 0; c < num_to_align; ++c)
             {
                 if(s[c] == '\n') { count += 1; }
             }
-            length -= offset;
-            s += offset;
+            length -= num_to_align;
+            s += num_to_align;
         }
 
         /* Main body */
