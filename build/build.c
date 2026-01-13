@@ -68,6 +68,8 @@ build_magpie()
     size ap_size = 0;
     char linux_buffer[ECO_KiB(20)] = {0};
     size li_size = 0;
+    char emscripten_buffer[ECO_KiB(20)] = {0};
+    size em_size = 0;
 
     // Load all the files
     char const *fname = "../src/magpie.h";
@@ -84,6 +86,10 @@ build_magpie()
 
     char const *fname_linux = "../src/magpie_linux.h";
     success = load_file(fname_linux, sizeof(linux_buffer), linux_buffer, &li_size);
+    StopIf(!success, return);
+
+    char const *fname_emscripten = "../src/magpie_emscripten.h";
+    success = load_file(fname_emscripten, sizeof(emscripten_buffer), emscripten_buffer, &em_size);
     StopIf(!success, return);
 
     // Merge them in a buffer
@@ -113,6 +119,13 @@ build_magpie()
 		insert_buffer(sizeof(finished_lib), &oi, finished_lib, insert_marker - c, c);
 		insert_buffer(sizeof(finished_lib), &oi, finished_lib, ap_size, apple_buffer);
 		insert_marker += 29;
+		c = insert_marker;
+	  }
+	  else if(str_eq("#include \"magpie_emscripten.h\"", insert_marker, 30))
+	  {
+		insert_buffer(sizeof(finished_lib), &oi, finished_lib, insert_marker - c, c);
+		insert_buffer(sizeof(finished_lib), &oi, finished_lib, em_size, emscripten_buffer);
+		insert_marker += 30;
 		c = insert_marker;
 	  }
 	  else

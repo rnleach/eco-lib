@@ -13,7 +13,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#ifndef __EMSCRIPTEN__
 #include <immintrin.h>
+#endif
 
 #ifndef __AVX2__
 #define __AVX2__ 0
@@ -850,6 +852,7 @@ elk_str_split_on_char(ElkStr str, char const split_char)
     return (ElkStrSplitPair) { .left = left, .right = right};
 }
 
+#ifndef __EMSCRIPTEN__
 static inline i64 
 elk_str_line_count(ElkStr str)
 {
@@ -912,6 +915,22 @@ elk_str_line_count(ElkStr str)
 
     return count;
 }
+#else
+static inline i64 
+elk_str_line_count(ElkStr str)
+{
+    StopIf(!str.start || str.len <= 0, return 0);
+
+    i64 count = 1;
+    for(size c = 0; c < str.len; ++c)
+    {
+        if(str.start[c] == '\n') { count += 1; }
+    }
+
+    return count;
+}
+
+#endif
 
 _Static_assert(sizeof(size) == sizeof(uptr), "intptr_t and uintptr_t aren't the same size?!");
 
@@ -1288,6 +1307,7 @@ ERR_RETURN:
 }
 #pragma warning(default : 4723)
 
+#ifndef __EMSCRIPTEN__
 static inline b32
 elk_str_parse_datetime_long_format(ElkStr str, ElkTime *out)
 {
@@ -1357,6 +1377,37 @@ elk_str_parse_datetime_long_format(ElkStr str, ElkTime *out)
 
     return false;
 }
+
+#else
+
+static inline b32
+elk_str_parse_datetime_long_format(ElkStr str, ElkTime *out)
+{
+    /* Calculate the start address to load it into the buffer with just the right positions for the characters. */
+    uptr start = (uptr)str.start + str.len + 7 - 32;
+
+    i64 year = INT64_MIN;
+    i64 month = INT64_MIN;
+    i64 day = INT64_MIN;
+    i64 hour = INT64_MIN;
+    i64 minutes = INT64_MIN;
+    i64 seconds = INT64_MIN;
+
+    if(
+        elk_str_parse_i64(elk_str_substr(str,  0, 4), &year    ) && 
+        elk_str_parse_i64(elk_str_substr(str,  5, 2), &month   ) &&
+        elk_str_parse_i64(elk_str_substr(str,  8, 2), &day     ) &&
+        elk_str_parse_i64(elk_str_substr(str, 11, 2), &hour    ) &&
+        elk_str_parse_i64(elk_str_substr(str, 14, 2), &minutes ) &&
+        elk_str_parse_i64(elk_str_substr(str, 17, 2), &seconds ))
+    {
+        *out = elk_time_from_ymd_and_hms((i16)year, (i8)month, (i8)day, (i8)hour, (i8)minutes, (i8)seconds);
+        return true;
+    }
+
+    return false;
+}
+#endif
 
 static inline b32
 elk_str_parse_datetime_compact_doy(ElkStr str, ElkTime *out)

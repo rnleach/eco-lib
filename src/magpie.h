@@ -1130,6 +1130,10 @@ mag_str_append_cstr_alloc(ElkStr dest, char const *src, MagAllocator *alloc)
 
 #include "magpie_apple_osx.h"
 
+#elif defined(__EMSCRIPTEN__)
+
+#include "magpie_emscripten.h"
+
 #else
 #error "Platform not supported by Magpie Library"
 #endif
