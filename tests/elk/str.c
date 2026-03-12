@@ -134,7 +134,7 @@ test_str_copy(void)
 
     Assert(too_short_str.len < str.len);       /* Too short is smaller! */
     Assert(too_short_str.start != str.start);  /* They're not the same location in memory  */
-    Assert(!elk_str_eq(too_short_str, str));   /* They NOT should compare as equals        */
+    Assert(!elk_str_eq(too_short_str, str));   /* They DO NOT should compare as equals     */
     Assert(too_short[8] == ' ');
     Assert(too_short[9] == 's');               /* NOT a '\0' because we had no extra room. */
 
@@ -172,8 +172,7 @@ test_str_substr(void)
 static void
 test_str_line_count(void)
 {
-    ElkStr null_str = {0};
-    Assert(elk_str_line_count(null_str) == 0);
+    Assert(elk_str_line_count(elk_str_null) == 0);
 
     char *one_liner = "Hello, world.";
     ElkStr one_liner_str = elk_str_from_cstring(one_liner);
@@ -190,6 +189,31 @@ test_str_line_count(void)
     Assert(elk_str_line_count(paragraph_str) == 7);
 }
 
+static void
+test_split_on_substr(void)
+{
+    char *paragraph = "This is a\n"
+                      "sample string that is\n"
+                      "multiple lines long.\n"
+                      "Roses are red\n"
+                      "Violets are blue\n"
+                      "This long string sucks\n"
+                      "And so does cancer.";
+    ElkStr paragraph_str = elk_str_from_cstring(paragraph);
+
+    ElkStrSplitPair pair = elk_str_split_on_substr_nt(paragraph_str, "string");
+    Assert(pair.left.len == 17);
+    Assert(pair.right.len == paragraph_str.len - 17 - 6);
+
+    ElkStrSplitPair pair2 = elk_str_split_on_substr_nt(pair.right, "string");
+    Assert(pair2.left.len == 71);
+    Assert(pair2.right.len == pair.right.len - 71 - 6);
+
+    pair = elk_str_split_on_substr_nt(paragraph_str, "a");
+    Assert(pair.left.len == 8);
+    Assert(pair.right.len == paragraph_str.len - 8 - 1);
+}
+
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                      All Str tests
  *-------------------------------------------------------------------------------------------------------------------------*/
@@ -203,4 +227,5 @@ elk_str_tests(void)
     test_str_copy();
     test_str_substr();
     test_str_line_count();
+    test_split_on_substr();
 }
