@@ -214,6 +214,32 @@ test_split_on_substr(void)
     Assert(pair.right.len == paragraph_str.len - 8 - 1);
 }
 
+static void
+test_split_at_substr(void)
+{
+    char *paragraph = "This is a\n"
+                      "sample string that is\n"
+                      "multiple lines long.\n"
+                      "Roses are red\n"
+                      "Violets are blue\n"
+                      "This long string sucks\n"
+                      "And so does cancer.";
+    ElkStr paragraph_str = elk_str_from_cstring(paragraph);
+
+    ElkStrSplitPair pair = elk_str_split_at_substr_nt(paragraph_str, "string");
+    Assert(pair.left.len == 17);
+    Assert(pair.right.len == paragraph_str.len - 17);
+
+    ElkStr right = { .start = pair.right.start + 6, .len = pair.right.len - 6 }; /* Clip out the match at the beginning */
+    ElkStrSplitPair pair2 = elk_str_split_at_substr_nt(right, "string");
+    Assert(pair2.left.len == 71);
+    Assert(pair2.right.len == right.len - 71);
+
+    pair = elk_str_split_at_substr_nt(paragraph_str, "a");
+    Assert(pair.left.len == 8);
+    Assert(pair.right.len == paragraph_str.len - 8);
+}
+
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                      All Str tests
  *-------------------------------------------------------------------------------------------------------------------------*/
@@ -228,4 +254,5 @@ elk_str_tests(void)
     test_str_substr();
     test_str_line_count();
     test_split_on_substr();
+    test_split_at_substr();
 }
