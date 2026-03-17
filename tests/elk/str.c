@@ -212,6 +212,11 @@ test_split_on_substr(void)
     pair = elk_str_split_on_substr_nt(paragraph_str, "a");
     Assert(pair.left.len == 8);
     Assert(pair.right.len == paragraph_str.len - 8 - 1);
+
+    ElkStr null_str = { .start = NULL, .len = 0 };
+    pair = elk_str_split_on_substr_nt(null_str, "C");
+    Assert(!pair.left.start && pair.left.len == 0);
+    Assert(!pair.right.start && pair.right.len == 0);
 }
 
 static void
@@ -238,6 +243,11 @@ test_split_at_substr(void)
     pair = elk_str_split_at_substr_nt(paragraph_str, "a");
     Assert(pair.left.len == 8);
     Assert(pair.right.len == paragraph_str.len - 8);
+
+    ElkStr null_str = { .start = NULL, .len = 0 };
+    pair = elk_str_split_at_substr_nt(null_str, "C");
+    Assert(!pair.left.start && pair.left.len == 0);
+    Assert(!pair.right.start && pair.right.len == 0);
 }
 
 /*---------------------------------------------------------------------------------------------------------------------------
