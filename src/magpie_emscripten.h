@@ -3,7 +3,7 @@
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                  Linux Implementation
  *---------------------------------------------------------------------------------------------------------------------------
- * Linux specific implementation goes here - things NOT in common with Apple / BSD
+ * emscripten specific implementation goes here
  */
 #include <stdlib.h>
 
