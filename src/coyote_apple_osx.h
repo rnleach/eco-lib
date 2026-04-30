@@ -9,6 +9,15 @@
 #include <sys/syslimits.h>
 #include <unistd.h>
 
+static inline i32 
+coy_cpu_count(void)
+{
+    i32 count;
+    size_t len = sizeof(count);
+    sysctlbyname("hw.ncpu", &count, &len, NULL, 0);
+    return count;
+}
+
 static inline void 
 coy_profile_initialize_os_metrics(void)
 {

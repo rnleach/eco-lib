@@ -226,6 +226,8 @@ static inline b32 coy_condvar_wake(CoyCondVar *cv);
 static inline b32 coy_condvar_wake_all(CoyCondVar *cv);
 static inline void coy_condvar_destroy(CoyCondVar *cv); /* Must set valid member to false. */
 
+static inline i32 coy_cpu_count(void);
+
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                  Thread Safe Channel
  *---------------------------------------------------------------------------------------------------------------------------

@@ -11,8 +11,15 @@
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/mman.h>
 #include <unistd.h>
+
+static inline i32 
+coy_cpu_count(void)
+{
+    return sysconf(_SC_NPROCESSORS_ONLN);
+}
 
 static inline void 
 coy_profile_initialize_os_metrics(void)

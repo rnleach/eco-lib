@@ -738,6 +738,14 @@ coy_condvar_destroy(CoyCondVar *cv)
     cv->valid = false;
 }
 
+static inline i32 
+coy_cpu_count(void)
+{
+    SYSTEM_INFO sysinfo;
+    GetSystemInfo(&sysinfo);
+    return sysinfo.dwNumberOfProcessors;
+}
+
 static inline u32 
 coy_task_thread_func_internal(void *thread_params)
 {
