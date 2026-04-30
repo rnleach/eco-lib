@@ -297,7 +297,7 @@ static inline void coy_task_thread_destroy(CoyTaskThread *thread);
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                      Thread Pool
  *---------------------------------------------------------------------------------------------------------------------------
- * A pool of worker threads.
+ * A pool of worker threads that can take an arbitrary function and it's data (arguments) for each call.
  */
 
 typedef enum 
