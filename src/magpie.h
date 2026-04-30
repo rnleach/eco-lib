@@ -634,6 +634,7 @@ mag_dyn_arena_alloc(MagDynArena *arena, size num_bytes, size alignment)
     if(block)
     {
         arena->current_offset = sizeof(MagDynArenaBlock);
+        arena->current_block = block;
         ptr = mag_dyn_arena_block_alloc(arena, block, num_bytes, alignment);
     }
 
