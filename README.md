@@ -26,6 +26,17 @@ My overall philosphy is to keep it simple, but not too simple. If it's in the li
 Some of the libraries depend on each other. Elk is the most basic and doesn't depend on anything else. Magpie depends on 
 elk, Coyote and Packrat each depend on Magpie and Elk.
 
+***
+Platforms: Linux, ~~Windows, Mac,~~ some emscripten.
+
+UPDATE: As of early 2026, all of the computers I do development on are Linux. I do have access to a Mac with Windows on a
+virtual machine, but it requires a lot of extra work. The likelihood of me being able to deploy any software on a Mac or
+windows machine in the foreseeable future is very low. As a result, I'm not going to waste time doing further testing on 
+these platforms. In the future, if I try to use these libraries on those platforms, I'll probably get linker errors for
+unimplemented functions, and I'll have some catching up to do!
+
+***
+
 ## Elk - A no standard, OS agnostic foundation.
 
   I like elk. They're really interesting, majestic animals. And did you know they have ivory?! 
@@ -46,7 +57,7 @@ elk, Coyote and Packrat each depend on Magpie and Elk.
   I redefined many of the builtin types to be more succinct. So uint64_t is u64 and the like. I think many people find this annoying, but types are so ubiquitous it seems weird to make their names so long. Save the long names for custom or unusual types. Also some of the renames (like size and byte) convey intent better than ptrdiff_t and char.
 
 ### String slices
-  Basic string slices. This amounts to a fat-pointer that includes the string length.
+  Basic string slices. This amounts to a fat-pointer that includes the string length. Includes some basic functionality for finding or splitting on substrings or characters and counting lines.
 
 ### Math
   I include random numbers, Kahan summation, and mathematical constants in this library because they do not depend on OS specific code.
@@ -75,7 +86,6 @@ This really has nothing to do with computers or software, but I thought the loos
  - Create every allocator I *might eventually* need. I only build what I need, so if it's in there, I've used it.
  - Interoperate with malloc/free.
 
-
 ## Coyote - general platform layer.
 
 A very basic platform library.
@@ -85,7 +95,7 @@ Coyotes are extremely adaptable animals. They've been in the Continental U.S. si
 I plan to support Windows, Mac OSX (BSD unix), and Linux (Ubuntu). The last two may just be considered POSIX for now, but I'm not commited to Posix.
 
 ### Retrieve info from the system
- Get the current time or terminal dimensions.
+ Get the current time, terminal dimensions, or logical CPU count.
 
 ### File system
  Interact with the OS file system and manipulate paths. Also I have functions for reading and writing numbers and strings from binary files to support bespoke file formats.
@@ -94,7 +104,7 @@ I plan to support Windows, Mac OSX (BSD unix), and Linux (Ubuntu). The last two 
  Dynamic loading and unloading of shared libraries.
 
 ### Threading
- Threads, mutexes, condition variables and a threadsafe channel for passing data around different threads.
+ Threads, mutexes, condition variables and a threadsafe channel for passing data around different threads. Includes a few different threading models including basic threads, task threads for pipeline architectures, and a threadpool.
 
 ### Profiling
  Functions and macros for profiling a program.
@@ -103,6 +113,8 @@ I plan to support Windows, Mac OSX (BSD unix), and Linux (Ubuntu). The last two 
 ## Packrat - collections.
 
  Data structures and functions for collections of objects. Think lists, arrays, etc. These collections may (or may not) be backed by dynamic memory allocators so that they can grow if needed. More limited collections are also available that rely on a fixed memory pool, so they can fill up. Some algorithms only make sense when applied to a collection, like sorting, so some of those algorithms are also implemented in this library.
+
+ One different approach I took was to implement ledgers instead of actual collections. For instance, an array ledger tracks how many slots in an array are used up, but it doesn't track the size of each slot or manage the memory. So I can use a single ledger to track a single array, or I can use it to track multiple parallel arrays (which I often do).
 
    - String interner
    - Queues
