@@ -16,6 +16,8 @@
 #include <unistd.h>
 #include <dlfcn.h>
 
+#include <stdatomic.h>
+
 static inline u64
 coy_time_now(void)
 {
@@ -611,6 +613,36 @@ coy_condvar_destroy(CoyCondVar *cv)
     int status = pthread_cond_destroy((pthread_cond_t *)&cv->cond_var[0]);
     Assert(status == 0);
     cv->valid = false;
+}
+
+static inline void 
+coy_atomic_i32_init(CoyAtomicI32 *obj, i32 value)
+{
+    atomic_init(obj, value);
+}
+
+static inline i32 
+coy_atomic_i32_load(CoyAtomicI32 const *obj)
+{
+    return atomic_load(obj);
+}
+
+static inline void 
+coy_atomic_i32_store(CoyAtomicI32 const *obj, i32 value)
+{
+    atomic_store(obj, value);
+}
+
+static inline i32 
+coy_atomic_i32_fetch_add(CoyAtomicI32 *obj, i32 value)
+{
+    return atomic_fetch_add(obj, value);
+}
+
+static inline i32 
+coy_atomic_i32_fetch_sub(CoyAtomicI32 *obj, i32 value)
+{
+    return atomic_fetch_sub(obj, value);
 }
 
 static inline void *

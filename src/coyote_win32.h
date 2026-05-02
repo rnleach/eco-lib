@@ -746,6 +746,36 @@ coy_cpu_count(void)
     return sysinfo.dwNumberOfProcessors;
 }
 
+static inline void 
+coy_atomic_i32_init(CoyAtomicI32 *obj, i32 value)
+{
+    *obj = value;
+}
+
+static inline i32 
+coy_atomic_i32_load(CoyAtomicI32 const *obj)
+{
+    return InterlockedCompareExchange((LONG*)obj, 0, 0);
+}
+
+static inline void 
+coy_atomic_i32_store(CoyAtomicI32 const *obj, i32 value)
+{
+    InterlockedExchange((LONG*)obj, value);
+}
+
+static inline i32 
+coy_atomic_i32_fetch_add(CoyAtomicI32 *obj, i32 value)
+{
+    return InterlockedExchangeAdd((LONG*)obj, value);
+}
+
+static inline i32 
+coy_atomic_i32_fetch_sub(CoyAtomicI32 *obj, i32 value)
+{
+    return InterlockedExchangeSub((LONG*)obj, value);
+}
+
 static inline u32 
 coy_task_thread_func_internal(void *thread_params)
 {

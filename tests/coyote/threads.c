@@ -432,6 +432,66 @@ test_task_multiple_producer_multiple_consumer(i32 num_to_send)
 
 /*--------------------------------------------------------------------------------------------------------------------------
  *
+ *                                                Tests for CoyAtomicI32
+ *
+ *-------------------------------------------------------------------------------------------------------------------------*/
+static void
+test_atomic_i32_thread_func_add_1(void *ptr)
+{
+    CoyAtomicI32 *obj = ptr;
+
+    for(i32 i = 0; i < 100; ++i)
+    {
+        coy_atomic_i32_fetch_add(obj, 1);
+    }
+}
+
+static void
+test_atomic_i32_thread_func_sub_1(void *ptr)
+{
+    CoyAtomicI32 *obj = ptr;
+
+    for(i32 i = 0; i < 100; ++i)
+    {
+        coy_atomic_i32_fetch_sub(obj, 1);
+    }
+}
+
+static void
+test_atomic_i32(void)
+{
+    CoyAtomicI32 count = {0};
+    coy_atomic_i32_init(&count, 0);
+
+    CoyThread threads[5] = {0};
+    for(size i = 0; i < ECO_ARRAY_SIZE(threads); ++i)
+    {
+        coy_thread_create(&threads[i], test_atomic_i32_thread_func_add_1, &count);
+    }
+
+    for(size i = 0; i < ECO_ARRAY_SIZE(threads); ++i)
+    {
+        coy_thread_join(&threads[i]);
+    }
+
+    Assert(coy_atomic_i32_load(&count) == 500);
+
+    coy_atomic_i32_init(&count, 0);
+    for(size i = 0; i < ECO_ARRAY_SIZE(threads); ++i)
+    {
+        coy_thread_create(&threads[i], test_atomic_i32_thread_func_sub_1, &count);
+    }
+
+    for(size i = 0; i < ECO_ARRAY_SIZE(threads); ++i)
+    {
+        coy_thread_join(&threads[i]);
+    }
+
+    Assert(coy_atomic_i32_load(&count) == -500);
+}
+
+/*--------------------------------------------------------------------------------------------------------------------------
+ *
  *                                                 Tests for ThreadPool
  *
  *-------------------------------------------------------------------------------------------------------------------------*/
@@ -439,6 +499,7 @@ typedef struct
 {
     i32 x;
     i32 two_x;
+    CoyBatchCompletion *bc;
 } CoyThreadPoolTestTaskData;
 
 static inline void
@@ -446,6 +507,7 @@ coy_thread_pool_test_task_function(void *data)
 {
     CoyThreadPoolTestTaskData *td = data;
     td->two_x = 2 * td->x;
+    coy_batch_completion_task_done(td->bc);
 }
 
 static void
@@ -458,28 +520,25 @@ test_thread_pool(void)
 
     CoyThreadPoolTestTaskData td[NUM_TEST_TASKS] = {0};
     CoyFuture futures[NUM_TEST_TASKS] = {0};
+    CoyBatchCompletion bc = {0};
+    coy_batch_completion_init(&bc, NUM_TEST_TASKS);
 
     for(i32 i = 0; i < NUM_TEST_TASKS; ++i)
     {
         td[i].x = i;
+        td[i].bc = &bc;
         futures[i] = coy_future_create(coy_thread_pool_test_task_function, &td[i]);
         coy_threadpool_submit(pool, &futures[i]);
     }
 
-    b32 complete = false;
-    while(!complete)
-    {
-        complete = true;
-        for(i32 i = 0; i < NUM_TEST_TASKS; ++i)
-        {
-            if(coy_future_is_complete(&futures[i]))
-            {
-                Assert(td[i].two_x == td[i].x * 2);
-                coy_future_mark_consumed(&futures[i]);
-            }
+    coy_batch_completion_wait(&bc);
+    coy_batch_completion_destroy(&bc);
 
-            complete &= coy_future_is_consumed(&futures[i]);
-        }
+    for(i32 i = 0; i < NUM_TEST_TASKS; ++i)
+    {
+        Assert(coy_future_is_complete(&futures[i]));
+        Assert(td[i].two_x == td[i].x * 2);
+        coy_future_mark_consumed(&futures[i]);
     }
 
     coy_threadpool_destroy(pool);
@@ -493,6 +552,7 @@ void
 coyote_threads_tests(void)
 {
     test_cpu_count();
+    test_atomic_i32();
 
     fprintf(stderr,".spsc..");
     test_single_producer_single_consumer(1000000);
