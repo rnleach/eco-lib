@@ -961,7 +961,7 @@ elk_str_split_at_substr(ElkStr str, ElkStr split_str)
 
         for(char *p = str.start; p <=last_possible; ++p)
         {
-            /* Quick single-byte filter → big win when first char rarely matches */
+            /* Quick single-byte filter, big win when first char rarely matches */
             if (*p == first && memcmp(p, split_str.start, split_str.len) == 0)
             {
                 ElkStr left = { .start = str.start, .len = (size)(p - str.start) };
@@ -1072,7 +1072,7 @@ elk_str_split_on_substr(ElkStr str, ElkStr split_str)
 
         for(char *p = str.start; p <=last_possible; ++p)
         {
-            /* Quick single-byte filter → big win when first char rarely matches */
+            /* Quick single-byte filter, big win when first char rarely matches */
             if (*p == first && memcmp(p, split_str.start, split_str.len) == 0)
             {
                 ElkStr left = { .start = str.start, .len = (size)(p - str.start) };
