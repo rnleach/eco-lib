@@ -521,14 +521,14 @@ test_thread_pool(void)
     CoyThreadPoolTestTaskData td[NUM_TEST_TASKS] = {0};
     CoyFuture futures[NUM_TEST_TASKS] = {0};
     CoyBatchCompletion bc = {0};
-    coy_batch_completion_init(&bc, NUM_TEST_TASKS);
+    coy_batch_completion_init(&bc, pool);
 
     for(i32 i = 0; i < NUM_TEST_TASKS; ++i)
     {
         td[i].x = i;
         td[i].bc = &bc;
         futures[i] = coy_future_create(coy_thread_pool_test_task_function, &td[i]);
-        coy_threadpool_submit(pool, &futures[i]);
+        coy_batch_completion_task_submit(&bc, &futures[i]);
     }
 
     coy_batch_completion_wait(&bc);

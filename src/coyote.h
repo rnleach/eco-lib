@@ -354,13 +354,15 @@ static inline void coy_threadpool_submit(CoyThreadPool *pool, CoyFuture *fut);
 
 typedef struct
 {
+    CoyThreadPool *pool;
     CoyAtomicI32 pending;
     CoyMutex mutex;
     CoyCondVar cond;
 } CoyBatchCompletion;
 
-static inline void coy_batch_completion_init(CoyBatchCompletion *bc, i32 num_tasks);
+static inline void coy_batch_completion_init(CoyBatchCompletion *bc, CoyThreadPool *pool);
 static inline void coy_batch_completion_destroy(CoyBatchCompletion *bc);
+static inline void coy_batch_completion_task_submit(CoyBatchCompletion *bc, CoyFuture *fut);
 static inline void coy_batch_completion_task_done(CoyBatchCompletion *bc); /* Called in worker thread when task complete. */
 static inline void coy_batch_completion_wait(CoyBatchCompletion *bc);      /* Called in thread waiting for tasks.         */
 
@@ -1266,11 +1268,12 @@ coy_threadpool_submit(CoyThreadPool *pool, CoyFuture *fut)
 }
 
 static inline void 
-coy_batch_completion_init(CoyBatchCompletion *bc, i32 num_tasks)
+coy_batch_completion_init(CoyBatchCompletion *bc, CoyThreadPool *pool)
 {
-    coy_atomic_i32_init(&bc->pending, num_tasks);
+    coy_atomic_i32_init(&bc->pending, 0);
     bc->mutex = coy_mutex_create();
     bc->cond = coy_condvar_create();
+    bc->pool = pool;
 }
 
 static inline void 
@@ -1281,11 +1284,19 @@ coy_batch_completion_destroy(CoyBatchCompletion *bc)
 }
 
 static inline void 
+coy_batch_completion_task_submit(CoyBatchCompletion *bc, CoyFuture *fut)
+{
+    i32 prev = coy_atomic_i32_fetch_add(&bc->pending, 1);
+    Assert(prev >= 0);
+    coy_threadpool_submit(bc->pool, fut);
+}
+
+static inline void 
 coy_batch_completion_task_done(CoyBatchCompletion *bc)
 {
     i32 prev = coy_atomic_i32_fetch_sub(&bc->pending, 1);
 
-    if(prev == 1) /* This was the last one, counter is now at zero so signal main thread. */
+    if(prev <= 1) /* This was the last one, counter is now at zero so signal main thread. */
     {
         coy_mutex_lock(&bc->mutex);
         coy_condvar_wake(&bc->cond);
