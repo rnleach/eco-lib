@@ -34,7 +34,7 @@ insert_buffer(size out_size, size *out_idx, char *out, size in_size, char *in)
 void
 build_elk()
 {
-    char main_buffer[ECO_KiB(340)] = {0};
+    char main_buffer[ECO_KiB(700)] = {0};
     size mb_size = 0;
 
     // Load all the files
