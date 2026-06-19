@@ -28,7 +28,8 @@
 #endif
 
 #if defined(_WIN64) || defined(_WIN32)
-#define __lzcnt32(a) __lzcnt(a)
+#define __builtin_clz(a) __lzcnt(a)
+#define __builtin_clzll(a) __lzcnt64(a)
 #define __builtin_popcount(a) __popcnt(a)
 #define __builtin_popcountll(a) __popcnt64(a)
 #define __builtin_ctz(a) _tzcnt_u32(a)
@@ -384,7 +385,15 @@ typedef struct
     size row;               /* Only counts parseable rows, comment lines don't count.                                */
     size col;               /* CSV column, that is, how many commas have we passed on this line.                     */
     b32 error;              /* Have we encountered an error while parsing?                                           */
-#if __AVX2__
+#if ELK_AVX_512
+    i32 byte_pos;
+
+    __m512i buf;
+    u64 buf_comma_bits;
+    u64 buf_newline_bits;
+    u64 buf_any_delimiter_bits;
+    u64 carry;
+#elif __AVX2__
     i32 byte_pos;
 
     __m256i buf;
@@ -1949,7 +1958,7 @@ elk_fnv1a_hash_str(ElkStr str)
     return elk_fnv1a_hash(str.len, str.start);
 }
 
-#if __AVX2__
+#if __AVX2__ || ELK_AVX_512
 static inline void elk_csv_helper_load_new_buffer_aligned(ElkCsvParser *p, i8 skip_bytes);
 #endif
 
@@ -1971,7 +1980,12 @@ elk_csv_create_parser(ElkStr input)
         }
     }
 
-#if __AVX2__
+#if ELK_AVX_512
+    i8 skip_bytes = (i8)((uptr)parser.remaining.start - ((uptr)parser.remaining.start & ~0x3F));
+    parser.remaining.start = (char *)((uptr)parser.remaining.start & ~0x3F); /* Force 64 byte alignment */
+    parser.carry = 0;
+    elk_csv_helper_load_new_buffer_aligned(&parser, skip_bytes);
+#elif __AVX2__
     i8 skip_bytes = (i8)((uptr)parser.remaining.start - ((uptr)parser.remaining.start & ~0x1F));
     parser.remaining.start = (char *)((uptr)parser.remaining.start & ~0x1F); /* Force 32 byte alignment */
     parser.carry = 0;
@@ -2016,12 +2030,73 @@ elk_csv_full_next_token(ElkCsvParser *parser)
     char *next_value_start = next_char;
     size next_value_len = 0;
 
+#if ELK_AVX_512
+    /* Do SIMD */
+
+    /* Are we in a quoted string where we should ignore commas? */
+    b32 stop = false;
+    u64 carry = 0;
+
+    __m512i quotes = _mm512_set1_epi8('"');
+    __m512i commas = _mm512_set1_epi8(',');
+    __m512i newlines = _mm512_set1_epi8('\n');
+
+    while(!stop && parser->remaining.len > num_chars_proc + 64)
+    {
+        __m512i chars = _mm512_loadu_si512((__m512i *)next_char);
+
+        __mmask64 quote_mask = _mm512_cmpeq_epi8_mask(chars, quotes);
+        __mmask64 comma_mask = _mm512_cmpeq_epi8_mask(chars, commas);
+        __mmask64 newline_mask = _mm512_cmpeq_epi8_mask(chars, newlines);
+
+        /* https://nullprogram.com/blog/2021/12/04/ - public domain code to create running mask */
+        u64 running_quote_mask = _cvtmask64_u64(quote_mask);
+        u64 r = running_quote_mask;
+
+        while(running_quote_mask)
+        {
+            r ^= -running_quote_mask ^ running_quote_mask;
+            running_quote_mask &= running_quote_mask - 1;
+        }
+
+        running_quote_mask = r ^ carry;
+        carry = -(running_quote_mask >> 63);
+        quote_mask = _cvtu64_mask64(running_quote_mask);
+
+        comma_mask = _kandn_mask64(quote_mask, comma_mask);
+        u64 comma_bits = _cvtmask64_u64(comma_mask);
+        newline_mask = _kandn_mask64(quote_mask, newline_mask);
+        u64 newline_bits = _cvtmask64_u64(newline_mask);
+
+        __mmask64 comma_or_newline_mask = _kor_mask64(comma_mask, newline_mask);
+        u64 comma_or_newline_bits = _cvtmask64_u64(comma_or_newline_mask);
+
+        u64 first_non_zero_bit_lsb = comma_or_newline_bits & ~(comma_or_newline_bits - 1);
+        i64 bit_pos = 63 - __builtin_clzll(first_non_zero_bit_lsb);
+        bit_pos = bit_pos > 63 || bit_pos < 0 ? 63 : bit_pos;
+
+        b32 comma = (comma_bits >> bit_pos) & 1ULL;
+        b32 newline = (newline_bits >> bit_pos) & 1ULL;
+        b32 comma_or_newline = (comma_or_newline_bits >> bit_pos) & 1ULL;
+
+        parser->row += newline;
+        parser->col += -col * newline + comma;
+        next_value_len += bit_pos + 1 - comma_or_newline;
+
+        next_char += bit_pos + 1 ;
+        num_chars_proc += bit_pos + 1 ;
+
+        stop = comma_or_newline;
+    }
+
+    b32 in_string = carry > 0;
+
+#elif __AVX2__
+    /* Do SIMD */
+
     /* Are we in a quoted string where we should ignore commas? */
     b32 stop = false;
     u32 carry = 0;
-
-#if __AVX2__
-    /* Do SIMD */
 
     __m256i quotes = _mm256_set1_epi8('"');
     __m256i commas = _mm256_set1_epi8(',');
@@ -2065,7 +2140,7 @@ elk_csv_full_next_token(ElkCsvParser *parser)
         u32 comma_or_newline_bits = _mm256_movemask_epi8(comma_or_newline_mask);
 
         u32 first_non_zero_bit_lsb = comma_or_newline_bits & ~(comma_or_newline_bits - 1);
-        i32 bit_pos = 31 - __lzcnt32(first_non_zero_bit_lsb);
+        i32 bit_pos = 31 - __builtin_clz(first_non_zero_bit_lsb);
         bit_pos = bit_pos > 31 || bit_pos < 0 ? 31 : bit_pos;
 
         b32 comma = (comma_bits >> bit_pos) & 1;
@@ -2082,10 +2157,15 @@ elk_csv_full_next_token(ElkCsvParser *parser)
         stop = comma_or_newline;
     }
 
+    b32 in_string = carry > 0;
+#else
+    b32 stop = false;
+    u32 carry = 0;
+
+    b32 in_string = carry > 0;
 #endif
 
     /* Finish up when not 32 remaining. */
-    b32 in_string = carry > 0;
     while(!stop && parser->remaining.len > num_chars_proc)
     {
         switch(*next_char)
@@ -2131,7 +2211,223 @@ ERR_RETURN:
     return (ElkCsvToken){ .row=parser->row, .col=parser->col, .value=(ElkStr){.start=parser->remaining.start, .len=0}};
 }
 
-#if __AVX2__
+#if ELK_AVX_512
+
+static const _Alignas(64) u8 CLEAR_MASKS[64][64] =
+    {
+        {0},
+        {255, 0},
+        {255, 255, 0},
+        {255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255},
+    };
+
+static inline void
+elk_csv_helper_load_new_buffer_aligned(ElkCsvParser *p, i8 skip_bytes)
+{
+    Assert((uptr)p->remaining.start % 64 == 0); /* Always aligned on a 64 byte boundary. */
+
+    /* Constants for matching delimiters & quotes. */
+    __m512i quotes = _mm512_set1_epi8('"');
+    __m512i commas = _mm512_set1_epi8(',');
+    __m512i newlines = _mm512_set1_epi8('\n');
+
+    /* Load data into the buffer. */
+    if(p->remaining.len < 64)
+    {
+        __m512i raw_data = _mm512_load_si512((__m512i *)(p->remaining.start));
+        __m512i mask = _mm512_load_si512((__m512i const *)CLEAR_MASKS[p->remaining.len]);
+        p->buf = _mm512_and_si512(raw_data, mask);
+        p->buf = _mm512_or_si512(p->buf, _mm512_andnot_si512(mask, newlines));
+    }
+    else
+    {
+        p->buf = _mm512_load_si512((__m512i *)(p->remaining.start));
+    }
+
+    /* Zero out leading bytes if necessary so they don't accidently match a delimiter. */
+    if(skip_bytes)
+    {
+        Assert(skip_bytes > 0 && skip_bytes < 64);
+        __m512i mask = _mm512_load_si512((__m512i const *)CLEAR_MASKS[skip_bytes - 1]);
+        p->buf = _mm512_andnot_si512(mask, p->buf);
+    }
+
+    __mmask64 quote_mask = _mm512_cmpeq_epi8_mask(p->buf, quotes);
+    __mmask64 comma_mask = _mm512_cmpeq_epi8_mask(p->buf, commas);
+    __mmask64 newline_mask = _mm512_cmpeq_epi8_mask(p->buf, newlines);
+
+    /* https://nullprogram.com/blog/2021/12/04/ - public domain code to create running mask */
+    u64 running_quote_mask = _cvtmask64_u64(quote_mask);
+    u64 r = running_quote_mask;
+
+    while(running_quote_mask)
+    {
+        r ^= -running_quote_mask ^ running_quote_mask;
+        running_quote_mask &= running_quote_mask - 1;
+    }
+
+    running_quote_mask = r ^ p->carry;
+    p->carry = -(running_quote_mask >> 63);
+    quote_mask = _cvtu64_mask64(running_quote_mask);
+
+    comma_mask = _kandn_mask64(quote_mask, comma_mask);
+    p->buf_comma_bits = _cvtmask64_u64(comma_mask);
+    newline_mask = _kandn_mask64(quote_mask, newline_mask);
+    p->buf_newline_bits = _cvtmask64_u64(newline_mask);
+
+    __mmask64 comma_or_newline_mask = _kor_mask64(comma_mask, newline_mask);
+    p->buf_any_delimiter_bits = _cvtmask64_u64(comma_or_newline_mask);
+
+    p->remaining.start += skip_bytes;
+    p->byte_pos = skip_bytes;
+}
+
+static inline ElkCsvToken
+elk_csv_fast_next_token(ElkCsvParser *parser)
+{
+    size row = parser->row;
+    size col = parser->col;
+
+    StopIf(elk_csv_finished(parser), goto ERR_RETURN);
+
+    /* Keep track of where this specific token actually starts in memory */
+    char *token_start = parser->remaining.start;
+    size next_value_len = 0;
+    b32 stop = false;
+
+    while(!stop)
+    {
+        u64 any_delim = parser->buf_any_delimiter_bits;
+
+        /* If no delimiters are left in the CURRENTly loaded 64-byte buffer */
+        if (any_delim == 0) 
+        {
+            /* Consume the rest of this buffer */
+            i32 run_len = 64 - parser->byte_pos;
+            next_value_len += run_len;
+            
+            /* Advance the parsing pointer strictly to the next 32-byte aligned boundary */
+            parser->remaining.start += run_len;
+            parser->remaining.len -= run_len;
+
+            if (parser->remaining.len > 0)
+            {
+                /* This will maintain perfect 64-byte alignment because we stepped by the exact remainder */
+                elk_csv_helper_load_new_buffer_aligned(parser, 0);
+                continue; 
+            }
+            else
+            {
+                stop = true;
+                break;
+            }
+        }
+
+        /* We have a delimiter! Cleanly isolate the lowest bit using Trailing Zero Count */
+        i32 bit_pos = _tzcnt_u64(any_delim); 
+        i32 run_len = bit_pos - parser->byte_pos;
+
+        u64 first_non_zero_bit_lsb = 1ULL << bit_pos;
+
+        b32 comma = (parser->buf_comma_bits >> bit_pos) & 1ULL;
+        b32 newline = (parser->buf_newline_bits >> bit_pos) & 1ULL;
+
+        /* Clear the bit */
+        parser->buf_comma_bits &= ~first_non_zero_bit_lsb;
+        parser->buf_newline_bits &= ~first_non_zero_bit_lsb;
+        parser->buf_any_delimiter_bits &= ~first_non_zero_bit_lsb;
+
+        /* Update tracking states */
+        parser->row += newline;
+        parser->col += -col * newline + comma;
+        
+        next_value_len += run_len;
+        
+        /* Advance structural state past the delimiter */
+        parser->remaining.start += run_len + 1;
+        parser->remaining.len -= run_len + 1;
+        parser->byte_pos = bit_pos + 1;
+
+        stop = true; /* Found our delimiter, time to return the token! */
+
+        /* If we consumed right up to the end of the buffer, reload next iteration */
+        if (parser->byte_pos >= 64)
+        {
+            if (parser->remaining.len > 0)
+            {
+                elk_csv_helper_load_new_buffer_aligned(parser, 0);
+            }
+        }
+    }
+
+    return (ElkCsvToken){ .row=row, .col=col, .value=(ElkStr){.start=token_start, .len=next_value_len}};
+
+ERR_RETURN:
+    parser->error = true;
+    return (ElkCsvToken){ .row=row, .col=col, .value=(ElkStr){.start=parser->remaining.start, .len=0}};
+}
+
+#elif __AVX2__
 
 static const _Alignas(32) u8 CLEAR_MASKS[32][32] =
     {
