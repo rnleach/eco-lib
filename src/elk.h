@@ -2087,7 +2087,7 @@ elk_csv_helper_load_new_buffer_aligned(ElkCsvParser *p, i8 skip_bytes)
     p->byte_pos = skip_bytes;
 }
 
-static inline ElkCsvToken 
+static inline ElkCsvToken
 elk_csv_fast_next_token(ElkCsvParser *parser)
 {
     size row = parser->row;
@@ -2095,57 +2095,77 @@ elk_csv_fast_next_token(ElkCsvParser *parser)
 
     StopIf(elk_csv_finished(parser), goto ERR_RETURN);
 
-    char *start = parser->remaining.start;
+    /* Keep track of where this specific token actually starts in memory */
+    char *token_start = parser->remaining.start;
     size next_value_len = 0;
     b32 stop = false;
-    
-    /* Stop will signal when a new delimiter is found, but we may need to process a few buffers worth of data to find one. */
+
     while(!stop)
     {
         u32 any_delim = parser->buf_any_delimiter_bits;
 
-        /* Find the position of the next delimiter or the end of the buffer */
-        u32 first_non_zero_bit_lsb = any_delim & ~(any_delim - 1);
-        i32 bit_pos = 31 - __lzcnt32(first_non_zero_bit_lsb);
-        bit_pos = bit_pos > 31 || bit_pos < 0 ? 31 : bit_pos;
-        i32 run_len = bit_pos - parser->byte_pos;
-
-        /* Detect type of delimiter, or maybe no delimiter and end of buffer. */
-        b32 comma = (parser->buf_comma_bits >> bit_pos) & 1;
-        b32 newline = (parser->buf_newline_bits >> bit_pos) & 1;
-        b32 comma_or_newline = (any_delim >> bit_pos) & 1;
-
-        /* Turn off that bit so we don't find it again! This delimiter has been processed. */
-        parser->buf_comma_bits &= ~first_non_zero_bit_lsb;
-        parser->buf_newline_bits &= ~first_non_zero_bit_lsb;
-        parser->buf_any_delimiter_bits &= ~first_non_zero_bit_lsb;
-
-        /* Update parser state based on position of next delimiter, or end of buffer. */
-        parser->row += newline;
-        parser->col += -col * newline + comma;
-        next_value_len += run_len + 1 - comma_or_newline;
-        parser->remaining.start += run_len + 1;
-        parser->remaining.len -= run_len + 1;
-        parser->byte_pos = bit_pos + 1;
-
-        /* Signal need to stop if we found a delimiter */
-        stop = comma_or_newline;
-
-        /* If we finished the buffer and need to scan the next one, load a new buffer! */
-        if(bit_pos + 1 > 31)
+        /* If no delimiters are left in the CURRENTly loaded 32-byte buffer */
+        if (any_delim == 0) 
         {
-            if(parser->remaining.len > 0)
+            /* Consume the rest of this buffer */
+            i32 run_len = 32 - parser->byte_pos;
+            next_value_len += run_len;
+            
+            /* Advance the parsing pointer strictly to the next 32-byte aligned boundary */
+            parser->remaining.start += run_len;
+            parser->remaining.len -= run_len;
+
+            if (parser->remaining.len > 0)
             {
+                /* This will maintain perfect 32-byte alignment because we stepped by the exact remainder */
                 elk_csv_helper_load_new_buffer_aligned(parser, 0);
+                continue; 
             }
             else
             {
                 stop = true;
+                break;
+            }
+        }
+
+        /* We have a delimiter! Cleanly isolate the lowest bit using Trailing Zero Count */
+        i32 bit_pos = _tzcnt_u32(any_delim); 
+        i32 run_len = bit_pos - parser->byte_pos;
+
+        u32 first_non_zero_bit_lsb = 1u << bit_pos;
+
+        b32 comma = (parser->buf_comma_bits >> bit_pos) & 1;
+        b32 newline = (parser->buf_newline_bits >> bit_pos) & 1;
+
+        /* Clear the bit */
+        parser->buf_comma_bits &= ~first_non_zero_bit_lsb;
+        parser->buf_newline_bits &= ~first_non_zero_bit_lsb;
+        parser->buf_any_delimiter_bits &= ~first_non_zero_bit_lsb;
+
+        /* Update tracking states */
+        parser->row += newline;
+        parser->col += -col * newline + comma;
+        
+        next_value_len += run_len;
+        
+        /* Advance structural state past the delimiter */
+        parser->remaining.start += run_len + 1;
+        parser->remaining.len -= run_len + 1;
+        parser->byte_pos = bit_pos + 1;
+
+        stop = true; /* Found our delimiter, time to return the token! */
+
+        /* If we consumed right up to the end of the buffer, reload next iteration */
+        if (parser->byte_pos >= 32)
+        {
+            if (parser->remaining.len > 0)
+            {
+                elk_csv_helper_load_new_buffer_aligned(parser, 0);
             }
         }
     }
 
-    return (ElkCsvToken){ .row=row, .col=col, .value=(ElkStr){.start=start, .len=next_value_len}};
+    return (ElkCsvToken){ .row=row, .col=col, .value=(ElkStr){.start=token_start, .len=next_value_len}};
 
 ERR_RETURN:
     parser->error = true;
