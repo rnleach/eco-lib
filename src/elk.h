@@ -893,7 +893,7 @@ elk_str_split_at_substr(ElkStr str, ElkStr split_str)
     }
 
     /* Check to make sure we have AVX2 */
-    if(ELK_AVX_512)
+#if ELK_AVX_512
     {
         __m512i const first = _mm512_set1_epi8(split_str.start[0]);
         char const second = (split_str.len >= 2) ? split_str.start[1] : 0;  /* dummy if len = 1 */
@@ -962,7 +962,7 @@ elk_str_split_at_substr(ElkStr str, ElkStr split_str)
         }
     }
     /* Check to make sure we have AVX2 */
-    else if(__AVX2__)
+#elif __AVX2__
     {
         __m256i const first = _mm256_set1_epi8(split_str.start[0]);
         char const second = (split_str.len >= 2) ? split_str.start[1] : 0;  /* dummy if len = 1 */
@@ -1031,7 +1031,7 @@ elk_str_split_at_substr(ElkStr str, ElkStr split_str)
             ++ptr;
         }
     }
-    else
+#else
     {
         char const first = split_str.start[0];
         char const *last_possible = str.start + str.len - split_str.len;
@@ -1047,6 +1047,7 @@ elk_str_split_at_substr(ElkStr str, ElkStr split_str)
             }
         }
     }
+#endif
 
     return (ElkStrSplitPair) { .left = str, .right = elk_str_null };
 }
@@ -1073,7 +1074,7 @@ elk_str_split_on_substr(ElkStr str, ElkStr split_str)
     if(split_str.len == 1) { return elk_str_split_on_char(str, split_str.start[0]); }
 
     /* Check to make sure we have AVX512 */
-    if(ELK_AVX_512)
+#if ELK_AVX_512
     {
         __m512i const first = _mm512_set1_epi8(split_str.start[0]);
         char const second = (split_str.len >= 2) ? split_str.start[1] : 0;  /* dummy if len = 1 */
@@ -1142,7 +1143,7 @@ elk_str_split_on_substr(ElkStr str, ElkStr split_str)
         }
     }
     /* Check to make sure we have AVX2 */
-    else if(__AVX2__)
+#elif __AVX2__
     {
         __m256i const first = _mm256_set1_epi8(split_str.start[0]);
         char const second = (split_str.len >= 2) ? split_str.start[1] : 0;  /* dummy if len = 1 */
@@ -1211,7 +1212,7 @@ elk_str_split_on_substr(ElkStr str, ElkStr split_str)
             ++ptr;
         }
     }
-    else
+#else
     {
         char const first = split_str.start[0];
         char const *last_possible = str.start + str.len - split_str.len;
@@ -1227,6 +1228,7 @@ elk_str_split_on_substr(ElkStr str, ElkStr split_str)
             }
         }
     }
+#endif
 
     return (ElkStrSplitPair) { .left = str, .right = elk_str_null };
 }
@@ -1238,7 +1240,6 @@ ElkStrSplitPair elk_str_split_on_substr_nt(ElkStr str, char *nt_string)
     return elk_str_split_on_substr(str, sub);
 }
 
-#ifndef __EMSCRIPTEN__
 static inline i64 
 elk_str_line_count(ElkStr str)
 {
@@ -1247,7 +1248,7 @@ elk_str_line_count(ElkStr str)
     i64 count = 1;
 
     /* Check to make sure we have AVX512. */
-    if(ELK_AVX_512)
+#if ELK_AVX_512
     {
         __m512i newline = _mm512_set1_epi8('\n');
 
@@ -1291,7 +1292,7 @@ elk_str_line_count(ElkStr str)
         }
     }
     /* Check to make sure we have AVX2. */
-    else if(__AVX2__)
+#elif __AVX2__
     {
         __m256i newline = _mm256_set1_epi8('\n');
 
@@ -1335,32 +1336,17 @@ elk_str_line_count(ElkStr str)
             }
         }
     }
-    else
+#else
     {
         for(size c = 0; c < str.len; ++c)
         {
             if(str.start[c] == '\n') { count += 1; }
         }
     }
-
-    return count;
-}
-#else
-static inline i64 
-elk_str_line_count(ElkStr str)
-{
-    StopIf(!str.start || str.len <= 0, return 0);
-
-    i64 count = 1;
-    for(size c = 0; c < str.len; ++c)
-    {
-        if(str.start[c] == '\n') { count += 1; }
-    }
-
-    return count;
-}
-
 #endif
+
+    return count;
+}
 
 _Static_assert(sizeof(size) == sizeof(uptr), "intptr_t and uintptr_t aren't the same size?!");
 
