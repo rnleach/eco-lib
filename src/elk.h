@@ -1956,6 +1956,43 @@ ERR_RETURN:
 }
 
 #if __AVX2__
+
+static const _Alignas(32) u8 CLEAR_MASKS[32][32] =
+    {
+        {0},
+        {255, 0},
+        {255, 255, 0},
+        {255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 0},
+        {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255},
+    };
+
 static inline void
 elk_csv_helper_load_new_buffer_aligned(ElkCsvParser *p, i8 skip_bytes)
 {
@@ -1972,87 +2009,24 @@ elk_csv_helper_load_new_buffer_aligned(ElkCsvParser *p, i8 skip_bytes)
     __m256i newlines = _mm256_set1_epi8('\n');
 
     /* Load data into the buffer. */
-    p->buf = _mm256_load_si256((__m256i *)(p->remaining.start));
+    if(p->remaining.len < 32)
+    {
+        __m256i raw_data = _mm256_load_si256((__m256i *)(p->remaining.start));
+        __m256i mask = _mm256_load_si256((__m256i const *)CLEAR_MASKS[p->remaining.len]);
+        p->buf = _mm256_and_si256(raw_data, mask);
+        p->buf = _mm256_or_si256(p->buf, _mm256_andnot_si256(mask, newlines));
+    }
+    else
+    {
+        p->buf = _mm256_load_si256((__m256i *)(p->remaining.start));
+    }
 
     /* Zero out leading bytes if necessary so they don't accidently match a delimiter. */
     if(skip_bytes)
     {
         Assert(skip_bytes > 0 && skip_bytes < 32);
-        switch(skip_bytes - 1)
-        {
-            case 30: p->buf = _mm256_insert_epi8(p->buf, 0, 30); /* fall through */
-            case 29: p->buf = _mm256_insert_epi8(p->buf, 0, 29); /* fall through */
-            case 28: p->buf = _mm256_insert_epi8(p->buf, 0, 28); /* fall through */
-            case 27: p->buf = _mm256_insert_epi8(p->buf, 0, 27); /* fall through */
-            case 26: p->buf = _mm256_insert_epi8(p->buf, 0, 26); /* fall through */
-            case 25: p->buf = _mm256_insert_epi8(p->buf, 0, 25); /* fall through */
-            case 24: p->buf = _mm256_insert_epi8(p->buf, 0, 24); /* fall through */
-            case 23: p->buf = _mm256_insert_epi8(p->buf, 0, 23); /* fall through */
-            case 22: p->buf = _mm256_insert_epi8(p->buf, 0, 22); /* fall through */
-            case 21: p->buf = _mm256_insert_epi8(p->buf, 0, 21); /* fall through */
-            case 20: p->buf = _mm256_insert_epi8(p->buf, 0, 20); /* fall through */
-            case 19: p->buf = _mm256_insert_epi8(p->buf, 0, 19); /* fall through */
-            case 18: p->buf = _mm256_insert_epi8(p->buf, 0, 18); /* fall through */
-            case 17: p->buf = _mm256_insert_epi8(p->buf, 0, 17); /* fall through */
-            case 16: p->buf = _mm256_insert_epi8(p->buf, 0, 16); /* fall through */
-            case 15: p->buf = _mm256_insert_epi8(p->buf, 0, 15); /* fall through */
-            case 14: p->buf = _mm256_insert_epi8(p->buf, 0, 14); /* fall through */
-            case 13: p->buf = _mm256_insert_epi8(p->buf, 0, 13); /* fall through */
-            case 12: p->buf = _mm256_insert_epi8(p->buf, 0, 12); /* fall through */
-            case 11: p->buf = _mm256_insert_epi8(p->buf, 0, 11); /* fall through */
-            case 10: p->buf = _mm256_insert_epi8(p->buf, 0, 10); /* fall through */
-            case  9: p->buf = _mm256_insert_epi8(p->buf, 0,  9); /* fall through */
-            case  8: p->buf = _mm256_insert_epi8(p->buf, 0,  8); /* fall through */
-            case  7: p->buf = _mm256_insert_epi8(p->buf, 0,  7); /* fall through */
-            case  6: p->buf = _mm256_insert_epi8(p->buf, 0,  6); /* fall through */
-            case  5: p->buf = _mm256_insert_epi8(p->buf, 0,  5); /* fall through */
-            case  4: p->buf = _mm256_insert_epi8(p->buf, 0,  4); /* fall through */
-            case  3: p->buf = _mm256_insert_epi8(p->buf, 0,  3); /* fall through */
-            case  2: p->buf = _mm256_insert_epi8(p->buf, 0,  2); /* fall through */
-            case  1: p->buf = _mm256_insert_epi8(p->buf, 0,  1); /* fall through */
-            case  0: p->buf = _mm256_insert_epi8(p->buf, 0,  0); /* fall through */
-        }
-    }
-
-    /* If at the end of the string, no worries just force all trailing characters in the buffer to be delimiters. */
-    if(p->remaining.len < 32)
-    {
-        size start = p->remaining.len;
-        Assert(start > 0 && start < 32);
-        switch(start)
-        {
-            case  1: p->buf = _mm256_insert_epi8(p->buf, '\n',  1); /* fall through */
-            case  2: p->buf = _mm256_insert_epi8(p->buf, '\n',  2); /* fall through */
-            case  3: p->buf = _mm256_insert_epi8(p->buf, '\n',  3); /* fall through */
-            case  4: p->buf = _mm256_insert_epi8(p->buf, '\n',  4); /* fall through */
-            case  5: p->buf = _mm256_insert_epi8(p->buf, '\n',  5); /* fall through */
-            case  6: p->buf = _mm256_insert_epi8(p->buf, '\n',  6); /* fall through */
-            case  7: p->buf = _mm256_insert_epi8(p->buf, '\n',  7); /* fall through */
-            case  8: p->buf = _mm256_insert_epi8(p->buf, '\n',  8); /* fall through */
-            case  9: p->buf = _mm256_insert_epi8(p->buf, '\n',  9); /* fall through */
-            case 10: p->buf = _mm256_insert_epi8(p->buf, '\n', 10); /* fall through */
-            case 11: p->buf = _mm256_insert_epi8(p->buf, '\n', 11); /* fall through */
-            case 12: p->buf = _mm256_insert_epi8(p->buf, '\n', 12); /* fall through */
-            case 13: p->buf = _mm256_insert_epi8(p->buf, '\n', 13); /* fall through */
-            case 14: p->buf = _mm256_insert_epi8(p->buf, '\n', 14); /* fall through */
-            case 15: p->buf = _mm256_insert_epi8(p->buf, '\n', 15); /* fall through */
-            case 16: p->buf = _mm256_insert_epi8(p->buf, '\n', 16); /* fall through */
-            case 17: p->buf = _mm256_insert_epi8(p->buf, '\n', 17); /* fall through */
-            case 18: p->buf = _mm256_insert_epi8(p->buf, '\n', 18); /* fall through */
-            case 19: p->buf = _mm256_insert_epi8(p->buf, '\n', 19); /* fall through */
-            case 20: p->buf = _mm256_insert_epi8(p->buf, '\n', 20); /* fall through */
-            case 21: p->buf = _mm256_insert_epi8(p->buf, '\n', 21); /* fall through */
-            case 22: p->buf = _mm256_insert_epi8(p->buf, '\n', 22); /* fall through */
-            case 23: p->buf = _mm256_insert_epi8(p->buf, '\n', 23); /* fall through */
-            case 24: p->buf = _mm256_insert_epi8(p->buf, '\n', 24); /* fall through */
-            case 25: p->buf = _mm256_insert_epi8(p->buf, '\n', 25); /* fall through */
-            case 26: p->buf = _mm256_insert_epi8(p->buf, '\n', 26); /* fall through */
-            case 27: p->buf = _mm256_insert_epi8(p->buf, '\n', 27); /* fall through */
-            case 28: p->buf = _mm256_insert_epi8(p->buf, '\n', 28); /* fall through */
-            case 29: p->buf = _mm256_insert_epi8(p->buf, '\n', 29); /* fall through */
-            case 30: p->buf = _mm256_insert_epi8(p->buf, '\n', 30); /* fall through */
-            case 31: p->buf = _mm256_insert_epi8(p->buf, '\n', 31); /* fall through */
-        }
+        __m256i mask = _mm256_load_si256((__m256i const *)CLEAR_MASKS[skip_bytes - 1]);
+        p->buf = _mm256_andnot_si256(mask, p->buf);
     }
 
     __m256i quote_mask = _mm256_cmpeq_epi8(p->buf, quotes);
