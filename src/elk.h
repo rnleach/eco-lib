@@ -2009,7 +2009,7 @@ elk_csv_helper_load_new_buffer_aligned(ElkCsvParser *p, i8 skip_bytes)
             case  4: p->buf = _mm256_insert_epi8(p->buf, 0,  4); /* fall through */
             case  3: p->buf = _mm256_insert_epi8(p->buf, 0,  3); /* fall through */
             case  2: p->buf = _mm256_insert_epi8(p->buf, 0,  2); /* fall through */
-            case  1: p->buf = _mm256_insert_epi8(p->buf, 0,  2); /* fall through */
+            case  1: p->buf = _mm256_insert_epi8(p->buf, 0,  1); /* fall through */
             case  0: p->buf = _mm256_insert_epi8(p->buf, 0,  0); /* fall through */
         }
     }
@@ -2021,7 +2021,7 @@ elk_csv_helper_load_new_buffer_aligned(ElkCsvParser *p, i8 skip_bytes)
         Assert(start > 0 && start < 32);
         switch(start)
         {
-            case  1: p->buf = _mm256_insert_epi8(p->buf, '\n',  2); /* fall through */
+            case  1: p->buf = _mm256_insert_epi8(p->buf, '\n',  1); /* fall through */
             case  2: p->buf = _mm256_insert_epi8(p->buf, '\n',  2); /* fall through */
             case  3: p->buf = _mm256_insert_epi8(p->buf, '\n',  3); /* fall through */
             case  4: p->buf = _mm256_insert_epi8(p->buf, '\n',  4); /* fall through */
