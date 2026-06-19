@@ -21,10 +21,18 @@
 #define __AVX2__ 0
 #endif
 
+#if defined(__AVX512F__) && defined(__AVX512BW__)
+#define ELK_AVX_512 1
+#else
+#define ELK_AVX_512 0
+#endif
+
 #if defined(_WIN64) || defined(_WIN32)
 #define __lzcnt32(a) __lzcnt(a)
 #define __builtin_popcount(a) __popcnt(a)
+#define __builtin_popcountll(a) __popcnt64(a)
 #define __builtin_ctz(a) _tzcnt_u32(a)
+#define __builtin_ctzll(a) _BItScanForward64(a)
 #endif
 
 /*---------------------------------------------------------------------------------------------------------------------------
@@ -885,7 +893,76 @@ elk_str_split_at_substr(ElkStr str, ElkStr split_str)
     }
 
     /* Check to make sure we have AVX2 */
-    if(__AVX2__)
+    if(ELK_AVX_512)
+    {
+        __m512i const first = _mm512_set1_epi8(split_str.start[0]);
+        char const second = (split_str.len >= 2) ? split_str.start[1] : 0;  /* dummy if len = 1 */
+
+        char const * const end = str.start + str.len - split_str.len + 1;
+        char * ptr = str.start;
+
+        /* Aligned prolog */
+        while((uptr)ptr % 64 != 0 && ptr < end)
+        {
+            if (
+                    *ptr == split_str.start[0]
+                    && (split_str.len < 2 || *(ptr + 1) == second)
+                    && memcmp(ptr, split_str.start, split_str.len) == 0
+               ) 
+            {
+                ElkStr left = { .start = str.start, .len = (size)(ptr - str.start) };
+                ElkStr right = { .start = ptr, .len = (size)(str.len - left.len) };
+                return (ElkStrSplitPair) { .left = left, .right = right };
+            }
+
+            ++ptr;
+        }
+
+        /* Main AVX512 loop */
+        while(ptr + 64 <= end)
+        {
+            __m512i const chunk = _mm512_load_si512((const __m512i*)ptr);
+            u64 mask = (u64)_mm512_cmpeq_epi8_mask(chunk, first);
+
+            while(mask != 0)
+            {
+                int bit = __builtin_ctzll(mask);
+                mask &= mask - 1;               // clear lowest set bit
+
+                char *candidate = ptr + bit;
+
+                /* Early rejection with second byte (huge win if second byte uncommon) */
+                if (split_str.len >= 2 && candidate[1] != second) { continue; }
+
+                if (memcmp(candidate, split_str.start, split_str.len) == 0)
+                {
+                    ElkStr left = { .start = str.start, .len = (size)(candidate - str.start) };
+                    ElkStr right = { .start = candidate, .len = (size)(str.len - left.len) };
+                    return (ElkStrSplitPair) { .left = left, .right = right };
+                }
+            }
+            ptr += 64;
+        }
+
+        /* Scalar tail (usually tiny) */
+        while (ptr < end)
+        {
+            if (
+                    *ptr == split_str.start[0]
+                    && (split_str.len < 2 || *(ptr + 1) == second)
+                    && memcmp(ptr, split_str.start, split_str.len) == 0
+               ) 
+            {
+                ElkStr left = { .start = str.start, .len = (size)(ptr - str.start) };
+                ElkStr right = { .start = ptr, .len = (size)(str.len - left.len) };
+                return (ElkStrSplitPair) { .left = left, .right = right };
+            }
+
+            ++ptr;
+        }
+    }
+    /* Check to make sure we have AVX2 */
+    else if(__AVX2__)
     {
         __m256i const first = _mm256_set1_epi8(split_str.start[0]);
         char const second = (split_str.len >= 2) ? split_str.start[1] : 0;  /* dummy if len = 1 */
@@ -995,8 +1072,77 @@ elk_str_split_on_substr(ElkStr str, ElkStr split_str)
     /* Delegate to elk_str_split_on_char if split_str is only a single character. */
     if(split_str.len == 1) { return elk_str_split_on_char(str, split_str.start[0]); }
 
+    /* Check to make sure we have AVX512 */
+    if(ELK_AVX_512)
+    {
+        __m512i const first = _mm512_set1_epi8(split_str.start[0]);
+        char const second = (split_str.len >= 2) ? split_str.start[1] : 0;  /* dummy if len = 1 */
+
+        char const * const end = str.start + str.len - split_str.len + 1;
+        char * ptr = str.start;
+
+        /* Aligned prolog */
+        while((uptr)ptr % 64 != 0 && ptr < end)
+        {
+            if (
+                    *ptr == split_str.start[0]
+                    && (split_str.len < 2 || *(ptr + 1) == second)
+                    && memcmp(ptr, split_str.start, split_str.len) == 0
+               ) 
+            {
+                ElkStr left = { .start = str.start, .len = (size)(ptr - str.start) };
+                ElkStr right = { .start = ptr + split_str.len, .len = (size)(str.len - split_str.len - left.len) };
+                return (ElkStrSplitPair) { .left = left, .right = right };
+            }
+
+            ++ptr;
+        }
+
+        /* Main AVX512 loop */
+        while(ptr + 64 <= end)
+        {
+            __m512i const chunk = _mm512_load_si512((const __m512i*)ptr);
+            u64 mask = (u64)_mm512_cmpeq_epi8_mask(chunk, first);
+
+            while(mask != 0)
+            {
+                int bit = __builtin_ctzll(mask);
+                mask &= mask - 1;               // clear lowest set bit
+
+                char *candidate = ptr + bit;
+
+                /* Early rejection with second byte (huge win if second byte uncommon) */
+                if (split_str.len >= 2 && candidate[1] != second) { continue; }
+
+                if (memcmp(candidate, split_str.start, split_str.len) == 0)
+                {
+                    ElkStr left = { .start = str.start, .len = (size)(candidate - str.start) };
+                    ElkStr right = { .start = candidate + split_str.len, .len = (size)(str.len - split_str.len - left.len) };
+                    return (ElkStrSplitPair) { .left = left, .right = right };
+                }
+            }
+            ptr += 64;
+        }
+
+        /* Scalar tail (usually tiny) */
+        while (ptr < end)
+        {
+            if (
+                    *ptr == split_str.start[0]
+                    && (split_str.len < 2 || *(ptr + 1) == second)
+                    && memcmp(ptr, split_str.start, split_str.len) == 0
+               ) 
+            {
+                ElkStr left = { .start = str.start, .len = (size)(ptr - str.start) };
+                ElkStr right = { .start = ptr + split_str.len, .len = (size)(str.len - split_str.len - left.len) };
+                return (ElkStrSplitPair) { .left = left, .right = right };
+            }
+
+            ++ptr;
+        }
+    }
     /* Check to make sure we have AVX2 */
-    if(__AVX2__)
+    else if(__AVX2__)
     {
         __m256i const first = _mm256_set1_epi8(split_str.start[0]);
         char const second = (split_str.len >= 2) ? split_str.start[1] : 0;  /* dummy if len = 1 */
@@ -1100,8 +1246,52 @@ elk_str_line_count(ElkStr str)
 
     i64 count = 1;
 
-    /* Check to make sure we have AVX. */
-    if(__AVX2__)
+    /* Check to make sure we have AVX512. */
+    if(ELK_AVX_512)
+    {
+        __m512i newline = _mm512_set1_epi8('\n');
+
+        char const *s = str.start;
+        uptr addr = (uptr)s;
+        usize offset = addr & 63;
+        usize num_to_align = 64 - offset;
+        usize length = str.len;
+        
+        /* Prefix */
+        if(num_to_align > 0 && num_to_align <= length)
+        {
+            for(usize c = 0; c < num_to_align; ++c)
+            {
+                if(s[c] == '\n') { count += 1; }
+            }
+            length -= num_to_align;
+            s += num_to_align;
+        }
+
+        /* Main body */
+        while (length >= 64) {
+            __m512i chunk = _mm512_load_si512((__m512i const *)s);
+
+            /* Compare for newlines and extract bitmask (bit i set if byte i == '\n') */
+            u64 nl_mask = (u64)_mm512_cmpeq_epi8_mask(chunk, newline);
+
+            count += __builtin_popcountll(nl_mask);
+
+            s += 64;
+            length -= 64;
+        }
+
+        /* Suffix */
+        if(length > 0)
+        {
+            for(usize c = 0; c < length; ++c)
+            {
+                if(s[c] == '\n') { count += 1; }
+            }
+        }
+    }
+    /* Check to make sure we have AVX2. */
+    else if(__AVX2__)
     {
         __m256i newline = _mm256_set1_epi8('\n');
 
