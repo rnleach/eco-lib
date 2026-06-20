@@ -2298,7 +2298,6 @@ elk_csv_helper_load_new_buffer_aligned(ElkCsvParser *p, i8 skip_bytes)
         __m512i raw_data = _mm512_load_si512((__m512i *)(p->remaining.start));
         __m512i mask = _mm512_load_si512((__m512i const *)CLEAR_MASKS[p->remaining.len]);
         p->buf = _mm512_and_si512(raw_data, mask);
-        //p->buf = _mm512_or_si512(p->buf, _mm512_andnot_si512(mask, newlines));
     }
     else
     {
@@ -2487,7 +2486,6 @@ elk_csv_helper_load_new_buffer_aligned(ElkCsvParser *p, i8 skip_bytes)
         __m256i raw_data = _mm256_load_si256((__m256i *)(p->remaining.start));
         __m256i mask = _mm256_load_si256((__m256i const *)CLEAR_MASKS[p->remaining.len]);
         p->buf = _mm256_and_si256(raw_data, mask);
-        p->buf = _mm256_or_si256(p->buf, _mm256_andnot_si256(mask, newlines));
     }
     else
     {
