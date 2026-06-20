@@ -2215,9 +2215,9 @@ ERR_RETURN:
 
 static const _Alignas(64) u8 CLEAR_MASKS[64][64] =
     {
-        {0},
         {255, 0},
         {255, 255, 0},
+        {255, 255, 255, 0},
         {255, 255, 255, 255, 0},
         {255, 255, 255, 255, 255, 0},
         {255, 255, 255, 255, 255, 255, 0},
@@ -2281,6 +2281,7 @@ static const _Alignas(64) u8 CLEAR_MASKS[64][64] =
         {255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255},
     };
 
+
 static inline void
 elk_csv_helper_load_new_buffer_aligned(ElkCsvParser *p, i8 skip_bytes)
 {
@@ -2297,7 +2298,7 @@ elk_csv_helper_load_new_buffer_aligned(ElkCsvParser *p, i8 skip_bytes)
         __m512i raw_data = _mm512_load_si512((__m512i *)(p->remaining.start));
         __m512i mask = _mm512_load_si512((__m512i const *)CLEAR_MASKS[p->remaining.len]);
         p->buf = _mm512_and_si512(raw_data, mask);
-        p->buf = _mm512_or_si512(p->buf, _mm512_andnot_si512(mask, newlines));
+        //p->buf = _mm512_or_si512(p->buf, _mm512_andnot_si512(mask, newlines));
     }
     else
     {
@@ -2359,7 +2360,7 @@ elk_csv_fast_next_token(ElkCsvParser *parser)
     {
         u64 any_delim = parser->buf_any_delimiter_bits;
 
-        /* If no delimiters are left in the CURRENTly loaded 64-byte buffer */
+        /* If no delimiters are left in the CURRENTLY loaded 64-byte buffer */
         if (any_delim == 0) 
         {
             /* Consume the rest of this buffer */
@@ -2431,9 +2432,9 @@ ERR_RETURN:
 
 static const _Alignas(32) u8 CLEAR_MASKS[32][32] =
     {
-        {0},
         {255, 0},
         {255, 255, 0},
+        {255, 255, 255, 0},
         {255, 255, 255, 255, 0},
         {255, 255, 255, 255, 255, 0},
         {255, 255, 255, 255, 255, 255, 0},
