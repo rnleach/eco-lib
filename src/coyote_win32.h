@@ -759,7 +759,7 @@ coy_atomic_i32_load(CoyAtomicI32 const *obj)
 }
 
 static inline void 
-coy_atomic_i32_store(CoyAtomicI32 const *obj, i32 value)
+coy_atomic_i32_store(CoyAtomicI32 *obj, i32 value)
 {
     InterlockedExchange((LONG*)obj, value);
 }

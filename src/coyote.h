@@ -240,7 +240,7 @@ typedef _Atomic i32 CoyAtomicI32;
 
 static inline void coy_atomic_i32_init(CoyAtomicI32 *obj, i32 value);
 static inline i32 coy_atomic_i32_load(CoyAtomicI32 const *obj);
-static inline void coy_atomic_i32_store(CoyAtomicI32 const *obj, i32 value);
+static inline void coy_atomic_i32_store(CoyAtomicI32 *obj, i32 value);
 static inline i32 coy_atomic_i32_fetch_add(CoyAtomicI32 *obj, i32 value);
 static inline i32 coy_atomic_i32_fetch_sub(CoyAtomicI32 *obj, i32 value);
 

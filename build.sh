@@ -5,11 +5,11 @@ SOURCEDIR="$PROJDIR/src"
 TESTDIR="$PROJDIR/tests"
 BUILD_SCRIPT_DIR="$PROJDIR/build"
 
-CFLAGS="-Wall -Werror -Wno-unknown-pragmas -std=c11 -march=native"
+CFLAGS="-Wall -Werror -Wno-unknown-pragmas -Wno-gcc-install-dir-libstdcxx -Wno-unknown-warning-option -std=c11 -march=native"
 CFLAGS="$CFLAGS -D_DEFAULT_SOURCE -D_GNU_SOURCE -DCOY_PROFILE -I$SOURCEDIR -I$TESTDIR"
 LDLIBS="-ldl -lm -lpthread"
 
-CC=cc
+CC=icx
 
 if [ "$#" -gt 0 -a "$1" = "debug" ]
 then

@@ -460,7 +460,7 @@ test_atomic_i32_thread_func_sub_1(void *ptr)
 static void
 test_atomic_i32(void)
 {
-    CoyAtomicI32 count = {0};
+    CoyAtomicI32 count = 0;
     coy_atomic_i32_init(&count, 0);
 
     CoyThread threads[5] = {0};
