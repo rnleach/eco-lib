@@ -22,6 +22,7 @@ main(int argc, char *argv[])
     elk_str_tests();
     elk_parse_tests();
     elk_csv_tests();
+    elk_random_tests();
     COY_END_PROFILE(ap);
     fprintf(stderr, ".complete.\n");
 
@@ -113,6 +114,7 @@ main(int argc, char *argv[])
 #include "elk/str.c"
 #include "elk/time.c"
 #include "elk/date.c"
+#include "elk/random.c"
 
 #include "magpie/sys_memory.c"
 #include "magpie/arena.c"

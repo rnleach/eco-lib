@@ -9,7 +9,7 @@ CFLAGS="-Wall -Werror -Wno-unknown-pragmas -Wno-gcc-install-dir-libstdcxx -Wno-u
 CFLAGS="$CFLAGS -D_DEFAULT_SOURCE -D_GNU_SOURCE -DCOY_PROFILE -I$SOURCEDIR -I$TESTDIR"
 LDLIBS="-ldl -lm -lpthread"
 
-CC=icx
+CC=cc
 
 if [ "$#" -gt 0 -a "$1" = "debug" ]
 then
@@ -27,6 +27,7 @@ then
     echo
     rm -f test
     rm -r -f *.dSYM
+    rm -r -f *.dat  # Used for checking random distributions.
     rm -f $BUILD_SCRIPT_DIR/build
     rm -f $BUILD_SCRIPT_DIR/elk.h
     rm -f $BUILD_SCRIPT_DIR/magpie.h
@@ -34,7 +35,7 @@ then
     rm -f $BUILD_SCRIPT_DIR/packrat.h
 else
     cd $BUILD_SCRIPT_DIR
-    $CC build.c -o build
+    $CC $CFLAGS build.c -o build
     ./build
     cd ..
     $CC $CFLAGS $TESTDIR/test.c -o test $LDLIBS

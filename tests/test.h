@@ -21,6 +21,7 @@ void elk_fnv1a_tests(void);
 void elk_str_tests(void);
 void elk_parse_tests(void);
 void elk_csv_tests(void);
+void elk_random_tests(void);
 
 void magpie_sys_memory_tests(void);
 void magpie_arena_tests(void);
