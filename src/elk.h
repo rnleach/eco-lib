@@ -489,6 +489,18 @@ typedef struct
 
 static inline ElkKahanAccumulator elk_kahan_accumulator_add(ElkKahanAccumulator acc, f64 value);
 
+#if ELK_AVX_512
+
+typedef struct
+{
+    __m512d sum;
+    __m512d err;
+} ElkAVX512KahanAccumulator;
+
+static inline ElkAVX512KahanAccumulator elk_avx12_kahan_accumulator_add(ElkAVX512KahanAccumulator acc, __m512d value);
+
+#endif
+
 /*---------------------------------------------------------------------------------------------------------------------------
  *
  *
@@ -7890,6 +7902,23 @@ elk_kahan_accumulator_add(ElkKahanAccumulator acc, f64 value)
 
     return acc;
 }
+
+
+#if ELK_AVX_512
+
+static inline ElkAVX512KahanAccumulator 
+elk_avx12_kahan_accumulator_add(ElkAVX512KahanAccumulator acc, __m512d value)
+{
+    __m512d y = _mm512_sub_pd(value,acc.err);
+    volatile __m512d t = _mm512_add_pd(acc.sum, value);
+    volatile __m512d z = _mm512_sub_pd(t, acc.sum);
+    acc.err = _mm512_sub_pd(z, y);
+    acc.sum = t;
+
+    return acc;
+}
+
+#endif
 
 #pragma warning(pop)
 #endif
