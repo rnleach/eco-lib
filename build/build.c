@@ -54,6 +54,28 @@ build_elk()
 }
 
 void
+build_eagle()
+{
+    char main_buffer[ECO_KiB(700)] = {0};
+    size mb_size = 0;
+
+    // Load all the files
+    char const *fname = "../src/eagle.h";
+    b32 success = load_file(fname, sizeof(main_buffer), main_buffer, &mb_size);
+    StopIf(!success, return);
+
+    // Write out the buffer
+    CoyFileWriter eagle_ = coy_file_create("eagle.h");
+    CoyFileWriter *eagle = &eagle_;
+    StopIf(!eagle->valid, fprintf(stderr, "Error opening eagle.h for output\n"); return);
+
+    size eagle_wrote = coy_file_write(eagle, mb_size, main_buffer);
+    Assert(eagle_wrote == mb_size);
+
+    coy_file_writer_close(eagle);
+}
+
+void
 build_magpie()
 {
     // Output buffer
@@ -273,6 +295,7 @@ int
 main(int argc, char *argv[])
 {
     build_elk();
+    build_eagle();
     build_magpie();
     build_coyote();
     build_packrat();

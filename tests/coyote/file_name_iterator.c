@@ -13,7 +13,7 @@ test_file_name_iterator(void)
     {
         "coyote.h", "coyote_win32.h", "coyote_apple_osx.h", "coyote_linux.h", "coyote_linux_apple_common.h",
         "magpie.h", "magpie_win32.h", "magpie_apple_osx.h", "magpie_linux.h", "magpie_emscripten.h",
-        "elk.h", "packrat.h"
+        "elk.h", "packrat.h", "eagle.h"
     };
 
     CoyFileNameIter iter_ = coy_file_name_iterator_open("src", NULL);

@@ -30,6 +30,7 @@ then
     rm -r -f *.dat  # Used for checking random distributions.
     rm -f $BUILD_SCRIPT_DIR/build
     rm -f $BUILD_SCRIPT_DIR/elk.h
+    rm -f $BUILD_SCRIPT_DIR/eagle.h
     rm -f $BUILD_SCRIPT_DIR/magpie.h
     rm -f $BUILD_SCRIPT_DIR/coyote.h
     rm -f $BUILD_SCRIPT_DIR/packrat.h

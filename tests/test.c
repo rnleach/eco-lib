@@ -26,6 +26,14 @@ main(int argc, char *argv[])
     COY_END_PROFILE(ap);
     fprintf(stderr, ".complete.\n");
 
+    /* Eagle Tests -------------------------------------------------------------------------------*/
+    fprintf(stderr, "eagle tests..");
+    ap = COY_START_PROFILE_BLOCK("eagle tests");
+    eagle_exp_tests();
+    eagle_log_tests();
+    COY_END_PROFILE(ap);
+    fprintf(stderr, ".complete.\n");
+
     /* Magpie Tests -----------------------------------------------------------------------------*/
     fprintf(stderr, "magpie memory tests..");
     ap = COY_START_PROFILE_BLOCK("magpie tests");
@@ -115,6 +123,9 @@ main(int argc, char *argv[])
 #include "elk/time.c"
 #include "elk/date.c"
 #include "elk/random.c"
+
+#include "eagle/exp.c"
+#include "eagle/log.c"
 
 #include "magpie/sys_memory.c"
 #include "magpie/arena.c"

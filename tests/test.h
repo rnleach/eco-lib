@@ -11,6 +11,7 @@
 
 #include <stdio.h>
 #include "../build/elk.h"
+#include "../build/eagle.h"
 #include "../build/magpie.h"
 #include "../build/coyote.h"
 #include "../build/packrat.h"
@@ -22,6 +23,9 @@ void elk_str_tests(void);
 void elk_parse_tests(void);
 void elk_csv_tests(void);
 void elk_random_tests(void);
+
+void eagle_exp_tests(void);
+void eagle_log_tests(void);
 
 void magpie_sys_memory_tests(void);
 void magpie_arena_tests(void);

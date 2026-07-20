@@ -23,8 +23,7 @@ My overall philosphy is to keep it simple, but not too simple. If it's in the li
      protected from data races before being passed into the function, the function itself will not
      introduce any data races.
 
-Some of the libraries depend on each other. Elk is the most basic and doesn't depend on anything else. Magpie depends on 
-elk, Coyote and Packrat each depend on Magpie and Elk.
+Some of the libraries depend on each other. Elk is the most basic and doesn't depend on anything else. Magpie and Eagle depend on elk, Coyote and Packrat each depend on Magpie and Elk.
 
 ***
 Platforms: Linux, ~~Windows, Mac,~~ some emscripten.
@@ -67,6 +66,15 @@ unimplemented functions, and I'll have some catching up to do!
 
 ### Hash functions
   Later libraries (especially Packrat) will need hashing, but hashing itself is not OS dependent, so it's included here.
+
+## Eagle - Custom math implementations.
+
+  I have no idea why eagles (or any animal) should be associated with math. But I like eagles, especially golden eagles, so here they are. 
+
+  The goal of implementing a function here is that I will be able to vectorize it and add that implementation here too. The only purpose of this part of the library is SIMD vectorized math functions.
+
+### Exponential and natural logarithm.
+  Both are implemented in AVX2 and AVX512 with range reduction and polynomial approximations. I evaluate the polynomials with Estrin's scheme or Horner's scheme, or a combination of both. Polynomials are generated using a program called Sollya.
 
 ## Magpie - memory management.
 Memory management library.
