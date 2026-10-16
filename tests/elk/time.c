@@ -174,6 +174,7 @@ test_increments_are_1_second(void)
 static b32
 struct_times_equal(ElkStructTime left, ElkStructTime right)
 {
+    /* Don't check the day_of_week and day_of_year members as those are ignored when calculating and ElkTime. */
     return left.year == right.year && left.month == right.month && left.day == right.day &&
            left.hour == right.hour && left.minute == right.minute && left.second == right.second;
 }
@@ -297,6 +298,22 @@ test_time_addition()
     Assert(elk_time_add(epoch, 14 * ElkMinute + 39 * ElkSecond) == t1);
 }
 
+static void
+test_day_of_week()
+{
+    ElkTime t0 = elk_time_from_ymd_and_hms(1970, 1, 1, 0, 0, 0);
+    ElkStructTime ts = elk_make_struct_time(t0);
+    Assert(ts.day_of_week == 4);
+
+    t0 = 0;
+    ts = elk_make_struct_time(t0);
+    Assert(ts.day_of_week == 1);
+
+    t0 = elk_time_from_ymd_and_hms(2026, 10, 15, 20, 37, 15);
+    ts = elk_make_struct_time(t0);
+    Assert(ts.day_of_week == 4);
+}
+
 /*---------------------------------------------------------------------------------------------------------------------------
  *                                                     All time tests
  *-------------------------------------------------------------------------------------------------------------------------*/
@@ -312,4 +329,5 @@ elk_time_tests(void)
     test_time_truncate_to_hour();
     test_time_truncate_to_specific_hour();
     test_time_addition();
+    test_day_of_week();
 }

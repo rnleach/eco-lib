@@ -199,13 +199,14 @@ typedef i64 ElkTimeDiff;
 
 typedef struct 
 {
-    i16 year;        /* 1-32,767 */
-    i8 month;        /* 1-12     */
-    i8 day;          /* 1-31     */
-    i8 hour;         /* 0-23     */
-    i8 minute;       /* 0-59     */
-    i8 second;       /* 0-59     */
-    i16 day_of_year; /* 1-366    */
+    i16 year;        /* 1-32,767        */
+    i8 month;        /* 1-12            */
+    i8 day;          /* 1-31            */
+    i8 hour;         /* 0-23            */
+    i8 minute;       /* 0-59            */
+    i8 second;       /* 0-59            */
+    i8 day_of_week;  /* 0-7, 0 = Sunday */
+    i16 day_of_year; /* 1-366           */
 } ElkStructTime;
 
 typedef enum
@@ -222,7 +223,7 @@ static ElkTime const elk_unix_epoch_timestamp = INT64_C(62135596800);
 static inline i64 elk_time_to_unix_epoch(ElkTime time);
 static inline ElkTime elk_time_from_unix_timestamp(i64 unixtime);
 static inline b32 elk_is_leap_year(int year);
-static inline ElkTime elk_make_time(ElkStructTime tm); /* Ignores the day_of_year member. */
+static inline ElkTime elk_make_time(ElkStructTime tm); /* Ignores the day_of_year and day_of_week members. */
 static inline ElkTime elk_time_truncate_to_hour(ElkTime time);
 static inline ElkTime elk_time_truncate_to_specific_hour(ElkTime time, int hour);
 static inline ElkTime elk_time_add(ElkTime time, ElkTimeDiff change_in_time);
@@ -680,6 +681,10 @@ elk_make_struct_time(ElkTime time)
 {
     Assert(time >= 0);
 
+    /* Calculate the day of the week */
+    i8 day_of_week = ((time / 86400) + 1) % 7;
+    Assert(day_of_week >= 0 && day_of_week < 7);
+
     /* Get the seconds part and then trim it off and convert to minutes */
     int const second = (int const)(time % SECONDS_PER_MINUTE);
     time = (time - second) / SECONDS_PER_MINUTE;
@@ -723,7 +728,7 @@ elk_make_struct_time(ElkTime time)
     Assert(time >= 0 && month > 0 && month <= 12);
     time -= sum_days_to_month[leap_year_idx][month]; /* Now in days since start of month */
 
-    /* Calculate the day */
+    /* Calculate the day of the year */
     int const day = (int const)(time + 1);
     Assert(day > 0 && day <= 31);
 
@@ -735,6 +740,7 @@ elk_make_struct_time(ElkTime time)
         .hour = hour, 
         .minute = minute, 
         .second = second,
+        .day_of_week = day_of_week,
         .day_of_year = day_of_year,
     };
 }
